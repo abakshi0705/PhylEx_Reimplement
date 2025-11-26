@@ -1,10 +1,12 @@
+print("[DEBUG] clone_prevalences.py imported")
 import numpy as np
 from math import lgamma
 
 
-def direchlet_log(phi, alpha):
+def dirichlet_log(phi, alpha):
+    alpha = np.asarray(alpha)
     alpha0 = np.sum(alpha)
-    norm = lgamma(alpha0) - np.sum(lgamma(a) for a in alpha)
+    norm = lgamma(alpha0) - sum(lgamma(a) for a in alpha)
     terms = np.sum((alpha - 1) * np.log(phi))
     return norm + terms
 
@@ -13,17 +15,21 @@ class PhiSample:
     def __init__(self, tree, alpha=1.0):
         self.tree = tree
         self.K = len(tree.nodes)
-        self.alpha = alpha
+        self.alpha = np.full(self.K, alpha)
         self.phi = self.previous_sample()
 
     def previous_sample(self):
         return np.random.dirichlet(self.alpha)
 
     def previous_log(self, phi):
-        return direchlet_log(phi, self.alpha)
+        return dirichlet_log(phi, self.alpha)
+
+    def sample_prior(self):
+        return np.random.dirichlet(self.alpha)
 
     def propose(self, phi, step=50):
-        return np.random.dirichlet(self * phi)
+        alpha_prop = phi * step
+        return np.random.dirichlet(alpha_prop)
 
     def update(self, phi, T, z, bulk_likelihood, scrna_likelihood):
         phi_propose = self.propose(phi)
@@ -39,4 +45,4 @@ class PhiSample:
         return phi
 
     def maptophi(self, z):
-        return self.phi(z)
+        return np.array([self.phi[k] for k in z])
