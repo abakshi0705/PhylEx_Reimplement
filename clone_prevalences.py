@@ -1,6 +1,8 @@
 print("[DEBUG] clone_prevalences.py imported")
 import numpy as np
 from math import lgamma
+from scrna import log_scrna_likelihood, ScRNALikelihoodParams
+from bulk_dna_likelihood import bulk_log_likelihood
 
 
 def dirichlet_log(phi, alpha):
@@ -31,17 +33,22 @@ class PhiSample:
         alpha_prop = phi * step
         return np.random.dirichlet(alpha_prop)
 
-    def update(self, phi, T, z, bulk_likelihood, scrna_likelihood):
+    def update(self, phi, snvs, epsilon, S, clone_has_snv):
         phi_propose = self.propose(phi)
-        loglike_old = bulk_likelihood(T, z, phi) + scrna_likelihood(T, z, phi)
-        loglike_new = bulk_likelihood(T, z, phi_propose) + scrna_likelihood(
-            T, z, phi_propose
+        log_bulk_old = bulk_log_likelihood(snvs, phi, epsilon)
+        log_bulk_new = bulk_log_likelihood(snvs, phi_propose, epsilon)
+        log_scrna_old = log_scrna_likelihood(S, phi, clone_has_snv, self.scrna_params)
+        log_scrna_new = log_scrna_likelihood(
+            S, phi_propose, clone_has_snv, self.scrna_params
         )
-        log_previous = self.previous_log(phi)
-        log_newprevious = self.previous_log(phi_propose)
-        log_accept = (loglike_new + log_newprevious) - (loglike_old + log_previous)
+        log_prior_old = self.prior_log(phi)
+        log_prior_new = self.prior_log(phi_propose)
+        log_accept = (log_bulk_new + log_scrna_new + log_prior_new) - (
+            log_bulk_old + log_scrna_old + log_prior_old
+        )
         if np.log(np.random.rand()) < log_accept:
             return phi_propose
+
         return phi
 
     def maptophi(self, z):
