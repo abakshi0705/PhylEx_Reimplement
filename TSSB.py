@@ -19,7 +19,7 @@ def get_node_list(lamb_0, lamb, gamma):
 
     node_list = []  #node list will hold all the nodes in our tree
 
-
+ 
     # initialize the root node as our base node
     # root node is able to break up the entire stick so upsilon equals 1
 
@@ -48,7 +48,7 @@ def tssb(node, lamb_0, lamb, gamma):
 
     node_list =[]
 
-    while (remaining_stick > 0.00005):
+    while (remaining_stick > 0.005):
         psi = np.random.beta(1, gamma)
         psi_array.append(psi)
         upsilon_k = remaining_stick * psi
