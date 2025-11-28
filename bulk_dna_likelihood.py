@@ -34,7 +34,7 @@ ClonePrevalences = List[float]
 
 
 # Return all genotypes for given major/minor copy numbers.
-def enumerate_genotypes(major_cn: int, minor_cn: int) -> List[Genotype]:
+def enumerate_genotypes(major_cn: int, minor_cn: int):
     total_copies = major_cn + minor_cn
     if total_copies <= 0:
         return [Genotype(total_copies=0, variant_copies=0)]
@@ -45,7 +45,7 @@ def enumerate_genotypes(major_cn: int, minor_cn: int) -> List[Genotype]:
 
 
 # Per-read variant probability θ(g, φ, ε) for one genotype.
-def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
+def theta(genotype: Genotype, phi_clone: float, epsilon: float):
     c = genotype.total_copies
     v = genotype.variant_copies
 
@@ -62,7 +62,7 @@ def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
 
 
 # log Binomial(n, p) at k, computed stably.
-def _log_binomial_pmf(k: int, n: int, p: float) -> float:
+def _log_binomial_pmf(k: int, n: int, p: float):
     if n == 0:
         return 0.0 if k == 0 else -math.inf
 
@@ -77,7 +77,7 @@ def _log_binomial_pmf(k: int, n: int, p: float) -> float:
 
 
 # Stable logsumexp.
-def _logsumexp(values: List[float]) -> float:
+def _logsumexp(values: List[float]):
     if not values:
         return -math.inf
     m = max(values)
@@ -88,7 +88,7 @@ def _logsumexp(values: List[float]) -> float:
 
 
 # log P(b_n | d_n, M_n, m_n, φ_{z_n}, ε) for one SNV.
-def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float) -> float:
+def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float):
     b_n = snv.variant_reads
     d_n = snv.total_reads
     M_n = snv.major_cn
@@ -121,7 +121,7 @@ def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float) -> float
 
 
 # Total bulk log-likelihood log p(B | T, z, φ).
-def bulk_log_likelihood(snvs: List[SNV], phi: ClonePrevalences, epsilon: float) -> float:
+def bulk_log_likelihood(snvs: List[SNV], phi: ClonePrevalences, epsilon: float):
     total = 0.0
     for snv in snvs:
         total += snv_log_likelihood(snv, phi, epsilon)
