@@ -1,34 +1,40 @@
-"""Bulk DNA likelihood for PhylEx (SNV + clone prevalences)."""
+# Bulk DNA likelihood for PhylEx (SNV + clone prevalences).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import List
 import math
 
 
-@dataclass
 class SNV:
-    """Single SNV in bulk data."""
-    variant_reads: int
-    total_reads: int
-    major_cn: int
-    minor_cn: int
-    clone_index: int
+    # Single SNV in bulk data.
+    def __init__(
+        self,
+        variant_reads: int,
+        total_reads: int,
+        major_cn: int,
+        minor_cn: int,
+        clone_index: int,
+    ):
+        self.variant_reads = variant_reads
+        self.total_reads = total_reads
+        self.major_cn = major_cn
+        self.minor_cn = minor_cn
+        self.clone_index = clone_index
 
 
-@dataclass
 class Genotype:
-    """Genotype with total copies c and variant copies v."""
-    total_copies: int
-    variant_copies: int
+    # Genotype with total copies c and variant copies v.
+    def __init__(self, total_copies: int, variant_copies: int):
+        self.total_copies = total_copies
+        self.variant_copies = variant_copies
 
 
 ClonePrevalences = List[float]
 
 
+# Return all genotypes for given major/minor copy numbers.
 def enumerate_genotypes(major_cn: int, minor_cn: int) -> List[Genotype]:
-    """Return all genotypes for given major/minor copy numbers."""
     total_copies = major_cn + minor_cn
     if total_copies <= 0:
         return [Genotype(total_copies=0, variant_copies=0)]
@@ -38,8 +44,8 @@ def enumerate_genotypes(major_cn: int, minor_cn: int) -> List[Genotype]:
     ]
 
 
+# Per-read variant probability θ(g, φ, ε) for one genotype.
 def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
-    """Per-read variant probability θ(g, φ, ε) for one genotype."""
     c = genotype.total_copies
     v = genotype.variant_copies
 
@@ -55,8 +61,8 @@ def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
     return phi_clone * (v / c) + (1.0 - phi_clone) * epsilon
 
 
+# log Binomial(n, p) at k, computed stably.
 def _log_binomial_pmf(k: int, n: int, p: float) -> float:
-    """log Binomial(n, p) at k, computed stably."""
     if n == 0:
         return 0.0 if k == 0 else -math.inf
 
@@ -66,16 +72,12 @@ def _log_binomial_pmf(k: int, n: int, p: float) -> float:
     eps = 1e-12
     p = min(max(p, eps), 1.0 - eps)
 
-    log_comb = (
-        math.lgamma(n + 1)
-        - math.lgamma(k + 1)
-        - math.lgamma((n - k) + 1)
-    )
+    log_comb = ( math.lgamma(n + 1)  - math.lgamma(k + 1)  - math.lgamma((n - k) + 1) )
     return log_comb + k * math.log(p) + (n - k) * math.log(1.0 - p)
 
 
+# Stable logsumexp.
 def _logsumexp(values: List[float]) -> float:
-    """Stable logsumexp."""
     if not values:
         return -math.inf
     m = max(values)
@@ -85,10 +87,8 @@ def _logsumexp(values: List[float]) -> float:
     return m + math.log(s)
 
 
-def snv_log_likelihood(snv: SNV,
-                       phi: ClonePrevalences,
-                       epsilon: float) -> float:
-    """log P(b_n | d_n, M_n, m_n, φ_{z_n}, ε) for one SNV."""
+# log P(b_n | d_n, M_n, m_n, φ_{z_n}, ε) for one SNV.
+def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float) -> float:
     b_n = snv.variant_reads
     d_n = snv.total_reads
     M_n = snv.major_cn
@@ -120,10 +120,8 @@ def snv_log_likelihood(snv: SNV,
     return log_sum - math.log(len(genotypes))
 
 
-def bulk_log_likelihood(snvs: List[SNV],
-                        phi: ClonePrevalences,
-                        epsilon: float) -> float:
-    """Total bulk log-likelihood log p(B | T, z, φ)."""
+# Total bulk log-likelihood log p(B | T, z, φ).
+def bulk_log_likelihood(snvs: List[SNV], phi: ClonePrevalences, epsilon: float) -> float:
     total = 0.0
     for snv in snvs:
         total += snv_log_likelihood(snv, phi, epsilon)
