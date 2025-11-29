@@ -29,6 +29,7 @@ class PhiSample:
     def sample_prior(self):
         return np.random.dirichlet(self.alpha)
 
+    #propose a new phi value for Metropolis-Hastings
     def propose(self, phi, step=50):
         alpha_prop = phi * step
         return np.random.dirichlet(alpha_prop)

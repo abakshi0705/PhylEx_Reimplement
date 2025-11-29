@@ -2,7 +2,6 @@
 scRNA-seq Likelihood Module
 
 This file computes the scRNA-seq likelihood term log p(S | T, z, phi)
-for the PhylEx reimplementation project.
 
 It models:
 - allelic imbalance using a Beta-Binomial mixture
@@ -15,7 +14,7 @@ import math
 from typing import List, Tuple
 
 
-
+#computes the sum of log probabilites in a list
 def logsumexp(values: List[float]) -> float:
     if not values:
         return float('-inf')
@@ -32,7 +31,7 @@ def log_beta_binomial(b: int, d: int, alpha: float, beta: float) -> float:
     if b < 0 or b > d:
         return float('-inf')
 
-    # log of the binomial coefficient C(d, b)
+    # log of the binomial coefficient C(d, b) - equivalent to d choose b in log space
     log_comb = (
         math.lgamma(d + 1)
         - math.lgamma(b + 1)
@@ -58,6 +57,7 @@ def log_beta_binomial(b: int, d: int, alpha: float, beta: float) -> float:
 class ScRNALikelihoodParams:
     """
     Holds the hyperparameters for the Beta-Binomial mixture model.
+    these are the hyperparameters that were provided in the supplementary file
 
     These define:
     - mono-allelic expression
