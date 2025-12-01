@@ -38,8 +38,15 @@ def enumerate_genotypes(major_cn: int, minor_cn: int) -> List[Genotype]:
     ]
 
 
+""" from the paper: 
+    theta(g, phi, epsilon) = 
+        epsilon                                     if nu(gn) = 0
+        phi(1-epsilon) + (1-phi)epsilon             if nu(gn) = c(gn)
+        phi(nu(gn)/c(gn)) + (1-phi)epsilon          otherwise
+"""
+
 def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
-    """Per-read variant probability θ(g, φ, ε) for one genotype."""
+    """Per-read variant probability theta(g, phi, epsilon) for one genotype."""
     c = genotype.total_copies
     v = genotype.variant_copies
 
@@ -55,6 +62,7 @@ def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
     return phi_clone * (v / c) + (1.0 - phi_clone) * epsilon
 
 
+#helper method
 def _log_binomial_pmf(k: int, n: int, p: float) -> float:
     """log Binomial(n, p) at k, computed stably."""
     if n == 0:
@@ -73,7 +81,7 @@ def _log_binomial_pmf(k: int, n: int, p: float) -> float:
     )
     return log_comb + k * math.log(p) + (n - k) * math.log(1.0 - p)
 
-
+#helper method
 def _logsumexp(values: List[float]) -> float:
     """Stable logsumexp."""
     if not values:
@@ -85,9 +93,7 @@ def _logsumexp(values: List[float]) -> float:
     return m + math.log(s)
 
 
-def snv_log_likelihood(snv: SNV,
-                       phi: ClonePrevalences,
-                       epsilon: float) -> float:
+def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float) -> float:
     """log P(b_n | d_n, M_n, m_n, φ_{z_n}, ε) for one SNV."""
     b_n = snv.variant_reads
     d_n = snv.total_reads

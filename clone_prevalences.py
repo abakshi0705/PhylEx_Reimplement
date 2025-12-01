@@ -42,9 +42,12 @@ class PhiSample:
     def sample_prior(self):
         return np.random.dirichlet(self.alpha)
 
+
     """Propose a new clone prevalence vector by sampling from a Dirichlet distrbution centered around the current phi.
       We scale phi by a step facotr so that most proposals stay close to the current value,
      which helps the MCMC explore the space smoothly without making huge jumps."""
+
+
     def propose(self, phi, step=50):
         alpha_prop = phi * step
         return np.random.dirichlet(alpha_prop)
