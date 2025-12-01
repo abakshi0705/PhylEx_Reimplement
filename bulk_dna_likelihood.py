@@ -1,5 +1,3 @@
-# Bulk DNA likelihood for PhylEx (SNV + clone prevalences).
-
 from __future__ import annotations
 
 from typing import List
@@ -10,11 +8,11 @@ class SNV:
     # Single SNV in bulk data.
     def __init__(
         self,
-        variant_reads: int,
-        total_reads: int,
-        major_cn: int,
-        minor_cn: int,
-        clone_index: int,
+        variant_reads: int, #number of reads supporing the variant allele
+        total_reads: int, #total read depth
+        major_cn: int, #the major copy numbers
+        minor_cn: int, #the minor copy numbers
+        clone_index: int, #which clone this SNV is assigned to z_n
     ):
         self.variant_reads = variant_reads
         self.total_reads = total_reads
@@ -24,70 +22,80 @@ class SNV:
 
 
 class Genotype:
-    # Genotype with total copies c and variant copies v.
+    # Genotype with total copies c and variant copies v. So for instance if c = 2, v = 1 then we have one reference and one variant
     def __init__(self, total_copies: int, variant_copies: int):
         self.total_copies = total_copies
         self.variant_copies = variant_copies
 
-
+#phi[k] is cellular prev of clone k
 ClonePrevalences = List[float]
 
 
-# Return all genotypes for given major/minor copy numbers.
+# Return all genotypes for given major/minor copy numbers so assume that total copy c is the sum of major and minor
+#Then for this c, consider all possible variant copy counts v which puts a uniform prior over v given c 
 def enumerate_genotypes(major_cn: int, minor_cn: int):
     total_copies = major_cn + minor_cn
+
+    #no DNA copies
     if total_copies <= 0:
         return [Genotype(total_copies=0, variant_copies=0)]
+    
     return [
         Genotype(total_copies=total_copies, variant_copies=v)
         for v in range(total_copies + 1)
     ]
 
 
-# Per-read variant probability θ(g, φ, ε) for one genotype.
+# Per read variant probability theta(g, phi, epsilon) for one genotype
 def theta(genotype: Genotype, phi_clone: float, epsilon: float):
     c = genotype.total_copies
     v = genotype.variant_copies
 
-    if c <= 0:
+    if c <= 0: #no copies so variant reads due to error
         return epsilon
 
-    if v == 0:
+    if v == 0: #SNV is absent so errors generate variant reads
         return epsilon
 
-    if v == c:
+    if v == c: #SNV is present in all copies and mixture of tumor clone (1 - epsilon) and epsilon weighted by phi_clone
         return phi_clone * (1.0 - epsilon) + (1.0 - phi_clone) * epsilon
 
+    #intermediate case 0 < v < c so within the clone the expected variant fraction is v/c
     return phi_clone * (v / c) + (1.0 - phi_clone) * epsilon
 
 
-# log Binomial(n, p) at k, computed stably.
+# log Binomial(n, p) at k computed stably so we just implement the og C(n, k) + k log p + (n - k) log(1 - p)
+# using lgamma for the log factorial terms.
 def _log_binomial_pmf(k: int, n: int, p: float):
-    if n == 0:
+    if n == 0: #if no trials 0
         return 0.0 if k == 0 else -math.inf
 
-    if k < 0 or k > n:
+    if k < 0 or k > n: #out of range k gives zero prob. in Bin
         return -math.inf
 
+    #make sure not log(0) bu clipping p into it
     eps = 1e-12
     p = min(max(p, eps), 1.0 - eps)
 
+     # log C(n, k) = log(n!) - log(k!) - log((n - k)!)
     log_comb = ( math.lgamma(n + 1)  - math.lgamma(k + 1)  - math.lgamma((n - k) + 1) )
     return log_comb + k * math.log(p) + (n - k) * math.log(1.0 - p)
 
 
-# Stable logsumexp.
+# Stable logsumexp over a list of log vals
 def _logsumexp(values: List[float]):
     if not values:
         return -math.inf
+
     m = max(values)
+
     if m == -math.inf:
         return -math.inf
+
     s = sum(math.exp(v - m) for v in values)
     return m + math.log(s)
 
-
-# log P(b_n | d_n, M_n, m_n, φ_{z_n}, ε) for one SNV.
+# log P(b_n | d_n, M_n, m_n, phi_{z_n}, epsilon) for one SNV
 def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float):
     b_n = snv.variant_reads
     d_n = snv.total_reads
@@ -101,12 +109,13 @@ def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float):
     try:
         phi_clone = phi[z_n]
     except IndexError:
-        raise IndexError(
+        raise IndexError( #if z_n out of range err to catch
             f"Clone index {z_n} out of range for phi of length {len(phi)}"
         )
 
-    genotypes = enumerate_genotypes(M_n, m_n)
+    genotypes = enumerate_genotypes(M_n, m_n) 
 
+    #compute log P(b_n | d_n, M_n, m_n, phi_{z_n}, epsilon) = log Bin(d_n, b_n; theta)
     log_terms: List[float] = []
     for g in genotypes:
         p = theta(g, phi_clone, epsilon)
@@ -116,13 +125,15 @@ def snv_log_likelihood(snv: SNV, phi: ClonePrevalences, epsilon: float):
     if not log_terms:
         return -math.inf
 
+    #assume a uniform prior over genotypes
     log_sum = _logsumexp(log_terms)
     return log_sum - math.log(len(genotypes))
 
 
-# Total bulk log-likelihood log p(B | T, z, φ).
+# Total bulk log-likelihood log p(B | T, z, phi) = summation_n P(b_n | d_n, M_n, m_n, phi_{z_n}, epsilon)
 def bulk_log_likelihood(snvs: List[SNV], phi: ClonePrevalences, epsilon: float):
     total = 0.0
-    for snv in snvs:
+    #sum per SNV log likelihoods in the bulk dataset
+    for snv in snvs: 
         total += snv_log_likelihood(snv, phi, epsilon)
     return total
