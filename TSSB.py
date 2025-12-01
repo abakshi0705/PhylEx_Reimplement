@@ -24,8 +24,14 @@ class Node():
         return self.parent
 
 
+"""
+gets list of nodes for a specific tree, based on parameters lamb_0, lamb, gamma
+
+requires 0 < lamb_0
+requires 0 < lamb <=1
+requires gamma > 0  
+"""
 def get_node_list(lamb_0, lamb, gamma):
-    #node list will hold all the nodes in our tree
     node_list = []  
 
     # initialize the root node as our base node
@@ -33,7 +39,7 @@ def get_node_list(lamb_0, lamb, gamma):
     root_node = Node(None, 1.0, 1.0, True, 0)
     node_list.append(root_node)
 
-
+    #initialize the progenitor cell
     # upsilon represents the proportion of the stick able to be broken by a node; this should equal 1 for the progenitor
     upsilon = 1.0     
     v_progenitor = np.random.beta(1, lamb_0 * math.pow(lamb, 1))
@@ -49,20 +55,23 @@ def get_node_list(lamb_0, lamb, gamma):
 
 
 
-""" requires 0 < lamb_0
+""" 
+Recursive helper function that generates all the children of a given node, and those childrens' nodes until
+remaining stick is smaller than a threshold value.
+
+requires 0 < lamb_0
 requires 0 < lamb <=1
-requires gamma > 0  """
+requires gamma > 0  
+"""
 def tssb(node, lamb_0, lamb, gamma):
     k = 0
-    psi_array = []
     height = node.height + 1
     remaining_stick = node.remaining_stick
 
     node_list =[]
 
-    while (remaining_stick > 0.005):
+    while (remaining_stick > 0.000005):
         psi = np.random.beta(1, gamma)
-        psi_array.append(psi)
         upsilon_k = remaining_stick * psi
     
         v_k = np.random.beta(1, lamb_0 * math.pow(lamb, height))
@@ -80,8 +89,12 @@ def tssb(node, lamb_0, lamb, gamma):
 
     return node_list
 
+"""
+Assign SNVs to a clone
+n: number of snvs
 
-# n: number of snvs
+the probability of an snv being assigned to a clone is equal to that clones pi value, which was found in the tssb algorithm
+"""
 def assign_snvs(n, node_list):
     non_root_nodes = []
     non_root_indices = []
@@ -107,6 +120,9 @@ def assign_snvs(n, node_list):
     return z.to_list()
 
 
+"""
+gets the snvs for a specific node index 
+"""
 def get_snvs_for_node(z, node_index):
     return [n for n, assigned_node in enumerate(z) if assigned_node == node_index]
 
