@@ -9,6 +9,14 @@ It models:
 - dropout (zero reads)
 - background noise for SNVs not present in a clone
 - cell-to-clone marginalization using clone prevalences phi
+
+Notation used:
+
+b = mutant allele count for an SNV in one cell
+d = total allele count covering that SNV in that cell
+S[c][n] = (b, d) for cell c and SNV n
+clone_has_snv[k][n] = True if clone k carries mutation n
+phi[k] = prevalence of clone k
 """
 
 import math
