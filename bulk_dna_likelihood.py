@@ -46,8 +46,15 @@ def enumerate_genotypes(major_cn: int, minor_cn: int):
     ]
 
 
-# Per read variant probability theta(g, phi, epsilon) for one genotype
-def theta(genotype: Genotype, phi_clone: float, epsilon: float):
+""" from the paper: 
+    theta(g, phi, epsilon) = 
+        epsilon                                     if nu(gn) = 0
+        phi(1-epsilon) + (1-phi)epsilon             if nu(gn) = c(gn)
+        phi(nu(gn)/c(gn)) + (1-phi)epsilon          otherwise
+"""
+
+def theta(genotype: Genotype, phi_clone: float, epsilon: float) -> float:
+    """Per-read variant probability theta(g, phi, epsilon) for one genotype."""
     c = genotype.total_copies
     v = genotype.variant_copies
 
