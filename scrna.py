@@ -14,11 +14,16 @@ import math
 from typing import List, Tuple
 
 
-#computes the sum of log probabilites in a list
+#computes the sum of log probabilites in a list (function is same as one in bulk_dna_likelihood)
 def logsumexp(values: List[float]) -> float:
     if not values:
-        return float('-inf')
+        return -math.inf
+
     m = max(values)
+
+    if m == -math.inf:
+        return -math.inf
+
     s = sum(math.exp(v - m) for v in values)
     return m + math.log(s)
 
@@ -65,16 +70,9 @@ class ScRNALikelihoodParams:
     - background/error distribution
     """
 
-    def __init__(
-        self,
-        w_mono: float = 0.5,       
-        mut_mono_alpha: float = 1.0,
-        mut_mono_beta: float = 5.0,
-        mut_bi_alpha: float = 5.0,
-        mut_bi_beta: float = 5.0,
-        bg_alpha: float = 0.5,
-        bg_beta: float = 20.0,
-    ):
+    def __init__(self, w_mono: float = 0.5, mut_mono_alpha: float = 1.0, mut_mono_beta: float = 5.0, mut_bi_alpha: float = 5.0,
+        mut_bi_beta: float = 5.0, bg_alpha: float = 0.5, bg_beta: float = 20.0):
+        
         self.w_mono = w_mono
         self.mut_mono_alpha = mut_mono_alpha
         self.mut_mono_beta = mut_mono_beta

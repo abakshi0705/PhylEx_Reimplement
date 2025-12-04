@@ -11,6 +11,7 @@ class Node():
         remaining_stick: the portion of the stick that remains after this node breaks off its piece
         is_root: if the node is the root or not
         height: the height of this node in the tree
+        snvs: snvs assigned to this node; snvs assigned after node has been created
     """
     def __init__(self, parent, upsilon_u, remaining_stick, is_root, height):
         self.parent = parent
@@ -19,6 +20,7 @@ class Node():
         self.is_root = is_root
         self.height = height
         self.pi_u = upsilon_u - remaining_stick
+        self.snvs = []
 
     def get_parent(self):
         return self.parent
@@ -117,7 +119,7 @@ def assign_snvs(n, node_list):
     #index of z represents SNV number
     z = np.random.choice(non_root_indices, size=n, p=pi_values)
 
-    return z.to_list()
+    return z.tolist()
 
 
 """
@@ -137,3 +139,4 @@ def get_node_genotypes(node_list, z, node_index):
         current_node = current_node.parent
 
     return sorted(genotype)
+

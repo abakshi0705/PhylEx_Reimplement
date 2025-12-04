@@ -9,6 +9,10 @@ This is the prior over clone prevalences.  """
 
 
 def dirichlet_log(phi, alpha):
+    phi = np.asarray(phi)
+    phi = np.clip(phi, 1e-12, 1.0) #prevents log(0)
+
+    print("phi = ", phi)
     alpha = np.asarray(alpha)
     alpha0 = np.sum(alpha)
     norm = lgamma(alpha0) - sum(lgamma(a) for a in alpha)
@@ -24,11 +28,14 @@ so we set alpha=1.0 for each clone.
 """
 
 class PhiSample:
-    def __init__(self, tree, alpha=1.0):
+    def __init__(self, tree, alpha=1.0, scrna_params=None):
         self.tree = tree
-        self.K = len(tree.nodes)
+        self.K = len(tree.nodes_except_root)
+        print("K = ", self.K, type(self.K))
+        print("alpha = ", alpha, type(alpha))
         self.alpha = np.full(self.K, alpha)
         self.phi = self.previous_sample()
+        self.scrna_params = scrna_params
 
     """Initial sample from dirichlet prior"""
     def previous_sample(self):
@@ -58,6 +65,7 @@ class PhiSample:
     and the DiRichlet prior over phi.
     The proposal is accepted with the standard MH acceptance probability. 
     The parameters are defined as follows: 
+    
     phi: current prevalence
     snvs: list of snv objects providing bulk read information
     epsilon: bulk sequencing noise level
@@ -68,12 +76,13 @@ class PhiSample:
         phi_propose = self.propose(phi)
         log_bulk_old = bulk_log_likelihood(snvs, phi, epsilon)
         log_bulk_new = bulk_log_likelihood(snvs, phi_propose, epsilon)
-        log_scrna_old = log_scrna_likelihood(S, phi, clone_has_snv, self.scrna_params)
-        log_scrna_new = log_scrna_likelihood(
-            S, phi_propose, clone_has_snv, self.scrna_params
-        )
-        log_prior_old = self.prior_log(phi)
-        log_prior_new = self.prior_log(phi_propose)
+        log_scrna_old = 0.0
+        log_scrna_new = 0.0
+        if S is not None:
+            log_scrna_old = log_scrna_likelihood(S, phi, clone_has_snv, self.scrna_params)
+            log_scrna_new = log_scrna_likelihood(S, phi_propose, clone_has_snv, self.scrna_params)
+        log_prior_old = self.previous_log(phi)
+        log_prior_new = self.previous_log(phi_propose)
         log_accept = (log_bulk_new + log_scrna_new + log_prior_new) - (
             log_bulk_old + log_scrna_old + log_prior_old
         )
