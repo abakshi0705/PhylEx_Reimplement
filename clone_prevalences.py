@@ -7,13 +7,16 @@ from bulk_dna_likelihood import bulk_log_likelihood
 log p(phi | alpha) = lgamma(sum(alpha)) - sum(lgamma(alpha_i)) + sum((alpha_i -1) * log(phi_1))
 This is the prior over clone prevalences.  """
 
+# Small floor to keep Dirichlet concentration parameters strictly positive
+_ALPHA_EPS = 1e-8
+
 
 def dirichlet_log(phi, alpha):
     phi = np.asarray(phi)
-    phi = np.clip(phi, 1e-12, 1.0) #prevents log(0)
-
-    print("phi = ", phi)
+    phi = np.clip(phi, 1e-12, 1.0)  # prevents log(0)
     alpha = np.asarray(alpha)
+    if np.any(alpha <= 0):
+        raise ValueError("dirichlet_log: all alpha concentrations must be > 0")
     alpha0 = np.sum(alpha)
     norm = lgamma(alpha0) - sum(lgamma(a) for a in alpha)
     terms = np.sum((alpha - 1) * np.log(phi))
@@ -33,30 +36,53 @@ class PhiSample:
         self.K = len(tree.nodes_except_root)
         print("K = ", self.K, type(self.K))
         print("alpha = ", alpha, type(alpha))
+        # keep the original alpha parameter and construct alpha vectors on demand
+        # validate alpha (must be > 0)
+        if np.isscalar(alpha):
+            if alpha <= 0:
+                raise ValueError("PhiSample: alpha must be > 0")
+        else:
+            a_arr = np.asarray(alpha)
+            if np.any(a_arr <= 0):
+                raise ValueError("PhiSample: all entries of alpha must be > 0")
+
+        self.alpha_param = alpha
+        # internal cached vector (kept for legacy uses); updated when tree size changes
         self.alpha = np.full(self.K, alpha)
         self.phi = self.previous_sample()
         self.scrna_params = scrna_params
 
     """Initial sample from dirichlet prior"""
     def previous_sample(self):
-        return np.random.dirichlet(self.alpha)
+        # sample using the current tree size; ensure concentrations are strictly positive
+        alpha_vec = np.full(self.K, self.alpha_param)
+        alpha_vec = np.clip(alpha_vec, _ALPHA_EPS, None)
+        return np.random.dirichlet(alpha_vec)
 
     """Computing the Dirichlet log prior for a given phi """
     def previous_log(self, phi):
-        return dirichlet_log(phi, self.alpha)
+        # ensure alpha vector matches phi length and is strictly positive
+        phi = np.asarray(phi)
+        alpha_vec = np.full(len(phi), self.alpha_param)
+        alpha_vec = np.clip(alpha_vec, _ALPHA_EPS, None)
+        return dirichlet_log(phi, alpha_vec)
 
     """Drawing fresh phi from Dirichlet prior"""
     def sample_prior(self):
-        return np.random.dirichlet(self.alpha)
-
+        alpha_vec = np.full(self.K, self.alpha_param)
+        alpha_vec = np.clip(alpha_vec, _ALPHA_EPS, None)
+        return np.random.dirichlet(alpha_vec)
 
     """Propose a new clone prevalence vector by sampling from a Dirichlet distrbution centered around the current phi.
       We scale phi by a step facotr so that most proposals stay close to the current value,
      which helps the MCMC explore the space smoothly without making huge jumps."""
 
-
     def propose(self, phi, step=50):
+        # form proposal concentration parameters centered on current phi
+        phi = np.asarray(phi)
         alpha_prop = phi * step
+        # ensure all entries > 0 for Dirichlet sampling
+        alpha_prop = np.clip(alpha_prop, _ALPHA_EPS, None)
         return np.random.dirichlet(alpha_prop)
 
     """
