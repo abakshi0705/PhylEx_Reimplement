@@ -5,6 +5,7 @@ from clone_prevalences import PhiSample, dirichlet_log
 from TSSB import Node, get_node_list, assign_snvs
 from bulk_dna_likelihood import SNV, bulk_log_likelihood, snv_log_likelihood
 from scrna import log_scrna_likelihood, ScRNALikelihoodParams, log_likelihood_cell_given_clone
+import time
 
 
 class Tree:
@@ -217,7 +218,7 @@ def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, sc
     if scrna_data is not None:
         log_scrna = log_scrna_likelihood(scrna_data, phi.tolist(), clone_has_snv, scrna_config)
 
-    log_prior = phi_sampler.prior_log(phi)
+    log_prior = phi_sampler.previous_log(phi)
 
     log_posterior = log_bulk + log_scrna + log_prior
 
@@ -225,6 +226,7 @@ def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, sc
 
 
 def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, burnin, scrna_config = None):
+    t0 = time.time()
     num_snvs = len(bulk_snvs)
 
     if scrna_config is None:
@@ -232,15 +234,24 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
 
     tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
     tree_sampler = TreeSampler(tree, scrna_config)
+    tree = tree_sampler.prune_empty_nodes(tree.snvs)
+    
 
     map_tree = {"tree": tree, "phi": phi, "z": z, "log_posterior": -math.inf}
 
     for i in range(num_iterations):
          print ("MCMC loop ", i)
          z_clone = adjust_z(tree.snvs, tree)
+         t1 = time.time(); print("adjust_z time:", t1 - t0)
+
          bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
+         t2 = time.time(); print("update_bulk_snvs_indices time:", t2 - t1)
+
          clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
-         
+         t3 = time.time(); print("make_clone_has_snv_matrix time:", t3 - t2)
+
+         print("total pre-iteration time:", t3 - t0)
+
          phi = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
 
          tree, new_snvs = tree_sampler.slice_sample_tree(phi, bulk_snvs, scrna_data, epsilon)
@@ -260,7 +271,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
                 phi = new_phi
             else:
                 # Tree shrunk, remove clones
-                phi = phi[:tree.K]
+                phi = phi[:tree.k]
                 phi = phi / np.sum(phi)  # Renormalize
         
          z_clone = adjust_z(tree.snvs, tree)

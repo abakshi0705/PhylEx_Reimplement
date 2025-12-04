@@ -72,7 +72,7 @@ def tssb(node, lamb_0, lamb, gamma):
 
     node_list =[]
 
-    while (remaining_stick > 0.000005):
+    while (remaining_stick > 0.005):
         psi = np.random.beta(1, gamma)
         upsilon_k = remaining_stick * psi
     
