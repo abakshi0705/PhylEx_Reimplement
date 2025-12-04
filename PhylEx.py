@@ -291,7 +291,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
     return map_tree
 
 
-#==========================================================================================
+""" #==========================================================================================
 #TEST ON SMALL, SYNTHETIC DATA
 
 if __name__ == "__main__":
@@ -324,4 +324,4 @@ if __name__ == "__main__":
     print(f"MAP log posterior: {map_result['log_posterior']:.2f}")
 
 def main():
-    pass
+    pass """
