@@ -11,6 +11,7 @@ class Node():
         remaining_stick: the portion of the stick that remains after this node breaks off its piece
         is_root: if the node is the root or not
         height: the height of this node in the tree
+        snvs: snvs assigned to this node; snvs assigned after node has been created
     """
     def __init__(self, parent, upsilon_u, remaining_stick, is_root, height):
         self.parent = parent
@@ -19,6 +20,7 @@ class Node():
         self.is_root = is_root
         self.height = height
         self.pi_u = upsilon_u - remaining_stick
+        self.snvs = []
 
     def get_parent(self):
         return self.parent
@@ -39,20 +41,20 @@ def get_node_list(lamb_0, lamb, gamma):
     root_node = Node(None, 1.0, 1.0, True, 0)
     node_list.append(root_node)
 
-    #initialize the progenitor cell
+    # initialize the progenitor cell
     # upsilon represents the proportion of the stick able to be broken by a node; this should equal 1 for the progenitor
     upsilon = 1.0     
     v_progenitor = np.random.beta(1, lamb_0 * math.pow(lamb, 1))
     pi_u = upsilon * v_progenitor
     remaining_stick = (1-pi_u) * upsilon
-    progenitor_node = Node(root_node, upsilon, remaining_stick, True, 1)
+    # progenitor is a cancer clone (not the healthy root), so is_root should be False
+    progenitor_node = Node(root_node, upsilon, remaining_stick, False, 1)
     node_list.append(progenitor_node)
 
     child_list = tssb(progenitor_node, lamb_0, lamb, gamma)
     node_list.extend(child_list)
 
     return node_list
-
 
 
 """ 
@@ -70,7 +72,7 @@ def tssb(node, lamb_0, lamb, gamma):
 
     node_list =[]
 
-    while (remaining_stick > 0.000005):
+    while (remaining_stick > 0.005):
         psi = np.random.beta(1, gamma)
         upsilon_k = remaining_stick * psi
     
@@ -111,13 +113,18 @@ def assign_snvs(n, node_list):
         pi_values.append(node.pi_u)
 
     pi_values = np.array(pi_values)
-    pi_values = pi_values / np.sum(pi_values)
+    total = np.sum(pi_values)
+    if total == 0 or len(pi_values) == 0:
+        raise ValueError(
+            "No non-root nodes with positive pi values found when assigning SNVs. Check tree generation"
+        )
+    pi_values = pi_values / total
 
-    #randomly a node based on the pi_value for that node to assign an SNV to
-    #index of z represents SNV number
+    # randomly a node based on the pi_value for that node to assign an SNV to
+    # index of z represents SNV number
     z = np.random.choice(non_root_indices, size=n, p=pi_values)
 
-    return z.to_list()
+    return z.tolist()
 
 
 """
@@ -127,7 +134,7 @@ def get_snvs_for_node(z, node_index):
     return [n for n, assigned_node in enumerate(z) if assigned_node == node_index]
 
 
-#gets a list of all SNV indices present at a specific node, including the ancestral SNVs
+# gets a list of all SNV indices present at a specific node, including the ancestral SNVs
 def get_node_genotypes(node_list, z, node_index):
     genotype = []
     current_node = node_list(node_index)
