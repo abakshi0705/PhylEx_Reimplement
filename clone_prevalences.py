@@ -47,7 +47,7 @@ class PhiSample:
                 raise ValueError("PhiSample: all entries of alpha must be > 0")
 
         self.alpha_param = alpha
-        # internal cached vector (kept for legacy uses); updated when tree size changes
+
         self.alpha = np.full(self.K, alpha)
         self.phi = self.previous_sample()
         self.scrna_params = scrna_params

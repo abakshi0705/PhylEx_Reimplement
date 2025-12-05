@@ -281,6 +281,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
 
     tree_depth = max(node.height for node in tree.node_list)
     
+    #reject any trees initialized with depth less than 3
     while tree_depth < 3:
         tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
         tree_depth = max(node.height for node in tree.node_list)
@@ -292,13 +293,16 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
     for i in range(num_iterations):
          #print ("MCMC loop ", i)
          z_clone = adjust_z(tree.snvs, tree)
-         t1 = time.time(); #print("adjust_z time:", t1 - t0)
+         t1 = time.time() 
+         #print("adjust_z time:", t1 - t0)
 
          bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
-         t2 = time.time(); #print("update_bulk_snvs_indices time:", t2 - t1)
+         t2 = time.time() 
+         #print("update_bulk_snvs_indices time:", t2 - t1)
 
          clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
-         t3 = time.time(); #print("make_clone_has_snv_matrix time:", t3 - t2)
+         t3 = time.time() 
+         #print("make_clone_has_snv_matrix time:", t3 - t2)
 
          #print("total pre-iteration time:", t3 - t0)
 
@@ -355,7 +359,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
     return map_tree
 
 
-""" #==========================================================================================
+""" 
 #TEST ON SMALL, SYNTHETIC DATA
 
 if __name__ == "__main__":
