@@ -1,5 +1,3 @@
-# run_simulation.py
-
 import os
 import pandas as pd
 import numpy as np
@@ -10,13 +8,10 @@ from PhylEx import mcmc
 from ete3 import Tree
 import matplotlib.pyplot as plt
 
-# -------------------------------
-# CONFIGURATION
-# -------------------------------
-# Path to the cherry folder                                      # //FIX
-TREE0_DIR = "/Users/sharvarivartak/Downloads/cherry"  # <-- put your cherry path here  # //FIX
+# Path to the cherry folder                                     
+TREE0_DIR = "cherry1"   
 
-# Defaults only used if CN columns are missing                   # //FIX
+# Defaults only used if CN columns are missing                
 DEFAULT_VARIANT_READS = 10
 DEFAULT_TOTAL_READS = 10
 DEFAULT_MAJOR_CN = 1
@@ -28,25 +23,25 @@ def load_bulk_snvs(tree0_dir):
     Load bulk SNVs from genotype_ssm.txt, which has columns:
     ID, CHR, POS, REF, ALT, b, d, major_cn, minor_cn.
     """
-    bulk_path = os.path.join(tree0_dir, "genotype_ssm.txt")      # //FIX
-    df = pd.read_csv(bulk_path, sep="\t")                        # //FIX
+    bulk_path = os.path.join(tree0_dir, "genotype_ssm.txt")      
+    df = pd.read_csv(bulk_path, sep="\t")                        
 
     snvs = []
     for _, row in df.iterrows():
         # read counts
-        variant_reads = int(row["b"])                            # //FIX
-        total_reads = int(row["d"])                              # //FIX
+        variant_reads = int(row["b"])                          
+        total_reads = int(row["d"])                            
 
-        # copy numbers (fall back to defaults if not present)    # //FIX
-        if "major_cn" in df.columns:                             # //FIX
-            major_cn = int(row["major_cn"])                      # //FIX
-        else:                                                    # //FIX
-            major_cn = DEFAULT_MAJOR_CN                          # //FIX
+        # copy numbers (fall back to defaults if not present)   
+        if "major_cn" in df.columns:                             
+            major_cn = int(row["major_cn"])                     
+        else:                                                    
+            major_cn = DEFAULT_MAJOR_CN                         
 
-        if "minor_cn" in df.columns:                             # //FIX
-            minor_cn = int(row["minor_cn"])                      # //FIX
-        else:                                                    # //FIX
-            minor_cn = DEFAULT_MINOR_CN                          # //FIX
+        if "minor_cn" in df.columns:                            
+            minor_cn = int(row["minor_cn"])                  
+        else:                                                  
+            minor_cn = DEFAULT_MINOR_CN                      
 
         snvs.append(
             SNV(
@@ -54,7 +49,7 @@ def load_bulk_snvs(tree0_dir):
                 total_reads=total_reads,
                 major_cn=major_cn,
                 minor_cn=minor_cn,
-                clone_index=0,   # dummy; MCMC will reassign      # //FIX
+                clone_index=0,   
             )
         )
     return snvs
@@ -111,9 +106,6 @@ def load_phi(tree0_dir):
     return load_true_phi(tree0_dir)
 
 
-# -------------------------------
-# RUN MCMC
-# -------------------------------
 def run_mcmc_single(tree0_dir):
     print(f"Running MCMC on {tree0_dir} ...")
     bulk_snvs = load_bulk_snvs(tree0_dir)
@@ -130,9 +122,6 @@ def run_mcmc_single(tree0_dir):
     return map_result
 
 
-# -------------------------------
-# PERFORMANCE ANALYSIS
-# -------------------------------
 def analyze_performance(tree0_dir, map_result):
     # SNV assignment
     true_snvs = load_true_snvs(tree0_dir)
@@ -140,9 +129,9 @@ def analyze_performance(tree0_dir, map_result):
     print(f"true_snvs length: {len(true_snvs)}, inferred_snvs length: {len(inferred_snvs)}")
 
     # ARI is label-invariant, so fine even if label IDs differ
-    min_len = min(len(true_snvs), len(inferred_snvs))            # //FIX
-    if min_len == 0:                                             # //FIX
-        print("No SNVs to compare for accuracy/ARI.")            # //FIX
+    min_len = min(len(true_snvs), len(inferred_snvs))          
+    if min_len == 0:                                            
+        print("No SNVs to compare for accuracy/ARI.")           
     else:
         acc = (true_snvs[:min_len] == inferred_snvs[:min_len]).mean()
         ari = adjusted_rand_score(true_snvs[:min_len], inferred_snvs[:min_len])
@@ -210,9 +199,7 @@ def build_cluster_labels_from_datum2node(tree0_dir, out_name="cluster_labels_fro
     return out_path
 
 
-# -------------------------------
-# MAIN
-# -------------------------------
 if __name__ == "__main__":
     map_result = run_mcmc_single(TREE0_DIR)
+    print(map_result["tree"].to_newick())
     analyze_performance(TREE0_DIR, map_result)

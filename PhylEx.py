@@ -18,12 +18,23 @@ class Tree:
         self.nodes_except_root = [node for node in node_list if not node.is_root]
         self.k = len(self.nodes_except_root)
     
+    def __eq__(self, other):
+        if not isinstance(other, Tree):
+            return False
+        if self.node_list == other.node_list and self.snvs == other.snvs:
+            if self.nodes_except_root == other.nodes_except_root:
+                if self.k == other.k:
+                    return True
+        
+        return False
+             
+    
     #returnes the index of a node in the full tree, given a clone index
     #a clone index would be an index from self.nodes_except_root
     def node_index_full_tree(self, clone_index):
         return self.node_list.index(self.nodes_except_root[clone_index])
     
-    def return_newick_form(self):
+    def to_newick(self):
         node_to_index = {node: i for i, node in enumerate(self.node_list)}
                # Build children adjacency
         children = {i: [] for i in range(len(self.node_list))}
@@ -54,6 +65,7 @@ class TreeSampler:
     def __init__(self, tree, scrna_params=None):
         self.tree = tree
         self.scrna_params = scrna_params if scrna_params else ScRNALikelihoodParams()
+        print("initial tree ", self.tree.to_newick())
 
     def slice_sample_tree(self, phi, bulk_snvs, scrna_data, epsilon, min_depth):
         #this list will hold all th new snv assignments that we make
@@ -66,10 +78,11 @@ class TreeSampler:
         new_tree = self.prune_empty_nodes(new_snvs)
 
         tree_depth = max(node.height for node in new_tree.node_list)
+        print("tree depth ", tree_depth)
     
         if tree_depth < min_depth:
             # Tree too shallow, reject and keep old tree
-            print(f"  Warning: Rejected tree with depth {tree_depth} < {min_depth}")
+            #print(f"  Warning: Rejected tree with depth {tree_depth} < {min_depth}")
             return self.tree, self.tree.snvs
     
         return new_tree, new_tree.snvs
@@ -265,29 +278,48 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
         scrna_config = ScRNALikelihoodParams()
 
     tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
-    tree_sampler = TreeSampler(tree, scrna_config)
-    tree = tree_sampler.prune_empty_nodes(tree.snvs)
-    
 
+    tree_depth = max(node.height for node in tree.node_list)
+    
+    while tree_depth < 3:
+        tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
+        tree_depth = max(node.height for node in tree.node_list)
+
+    tree_sampler = TreeSampler(tree, scrna_config)
+    
     map_tree = {"tree": tree, "phi": phi, "z": z, "log_posterior": -math.inf}
 
     for i in range(num_iterations):
-         print ("MCMC loop ", i)
+         #print ("MCMC loop ", i)
          z_clone = adjust_z(tree.snvs, tree)
-         t1 = time.time(); print("adjust_z time:", t1 - t0)
+         t1 = time.time(); #print("adjust_z time:", t1 - t0)
 
          bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
-         t2 = time.time(); print("update_bulk_snvs_indices time:", t2 - t1)
+         t2 = time.time(); #print("update_bulk_snvs_indices time:", t2 - t1)
 
          clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
-         t3 = time.time(); print("make_clone_has_snv_matrix time:", t3 - t2)
+         t3 = time.time(); #print("make_clone_has_snv_matrix time:", t3 - t2)
 
-         print("total pre-iteration time:", t3 - t0)
+         #print("total pre-iteration time:", t3 - t0)
 
-         phi = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
+         phi_temp = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
 
-         tree, new_snvs = tree_sampler.slice_sample_tree(phi, bulk_snvs, scrna_data, epsilon, 3)
+         old_tree_k = tree.k
+         old_tree_id = id(tree)  
+
+         new_tree, new_snvs = tree_sampler.slice_sample_tree(phi_temp, bulk_snvs, scrna_data, epsilon, 3)
          
+         tree_changed = (id(new_tree) != old_tree_id) or (new_tree.k != old_tree_k)
+
+         if not tree_changed:
+             #print("reached a")
+             phi = phi_temp
+             tree = tree
+         else:
+             #print("reached b")
+             phi = phi_temp
+             tree = new_tree
+
          tree_sampler.tree = tree
         
          phi_sampler.tree = tree
