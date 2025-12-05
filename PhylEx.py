@@ -23,6 +23,31 @@ class Tree:
     def node_index_full_tree(self, clone_index):
         return self.node_list.index(self.nodes_except_root[clone_index])
     
+    def return_newick_form(self):
+        node_to_index = {node: i for i, node in enumerate(self.node_list)}
+               # Build children adjacency
+        children = {i: [] for i in range(len(self.node_list))}
+        root_index = None
+
+        for index, node in enumerate(self.node_list):
+            if node.is_root:
+                root_index = index
+            if node.parent is not None:
+                parent_index = node_to_index[node.parent]
+                children[parent_index].append(index)
+        
+        def build_subtree(index):
+           node = self.node_list[index]
+           label = f"N{index}"
+           if not children[index]:
+               # Leaf
+               return label
+           else:
+               child_strs = [build_subtree(c) for c in children[index]]
+               return "(" + ",".join(child_strs) + ")" + label
+
+        return build_subtree(root_index) + ";"
+    
 
 #class for slice sampling a tree; we use this to explore the tree space
 class TreeSampler:
@@ -30,7 +55,7 @@ class TreeSampler:
         self.tree = tree
         self.scrna_params = scrna_params if scrna_params else ScRNALikelihoodParams()
 
-    def slice_sample_tree(self, phi, bulk_snvs, scrna_data, epsilon):
+    def slice_sample_tree(self, phi, bulk_snvs, scrna_data, epsilon, min_depth):
         #this list will hold all th new snv assignments that we make
         new_snvs = self.tree.snvs.copy()
 
@@ -40,6 +65,13 @@ class TreeSampler:
         #create a new tree with the new_snvs
         new_tree = self.prune_empty_nodes(new_snvs)
 
+        tree_depth = max(node.height for node in new_tree.node_list)
+    
+        if tree_depth < min_depth:
+            # Tree too shallow, reject and keep old tree
+            print(f"  Warning: Rejected tree with depth {tree_depth} < {min_depth}")
+            return self.tree, self.tree.snvs
+    
         return new_tree, new_tree.snvs
 
 
@@ -254,7 +286,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
 
          phi = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
 
-         tree, new_snvs = tree_sampler.slice_sample_tree(phi, bulk_snvs, scrna_data, epsilon)
+         tree, new_snvs = tree_sampler.slice_sample_tree(phi, bulk_snvs, scrna_data, epsilon, 3)
          
          tree_sampler.tree = tree
         
