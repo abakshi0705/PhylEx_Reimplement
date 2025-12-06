@@ -118,6 +118,7 @@ def run_mcmc_single(tree0_dir):
         epsilon=0.001,
         num_iterations=1000,
         burnin=250,
+        use_fixed_tree=True
     )
     return map_result
 

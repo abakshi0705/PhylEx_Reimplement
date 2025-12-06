@@ -2,7 +2,7 @@
 import numpy as np
 import math
 from clone_prevalences import PhiSample, dirichlet_log
-from TSSB import Node, get_node_list, assign_snvs
+from TSSB import Node, Simplified_Node, get_node_list, assign_snvs, initialize_fixed_tree_snv_assignment
 from bulk_dna_likelihood import SNV, bulk_log_likelihood, snv_log_likelihood
 from scrna import log_scrna_likelihood, ScRNALikelihoodParams, log_likelihood_cell_given_clone
 import time
@@ -74,18 +74,20 @@ class TreeSampler:
         for n in range(len(self.tree.snvs)):
             new_snvs[n] = self.sample_snv_assignment(n, new_snvs, phi, bulk_snvs, scrna_data, epsilon)
         
-        #create a new tree with the new_snvs
-        new_tree = self.prune_empty_nodes(new_snvs)
+        self.tree.snvs = new_snvs
 
-        tree_depth = max(node.height for node in new_tree.node_list)
-        print("tree depth ", tree_depth)
+        #create a new tree with the new_snvs
+        #new_tree = self.prune_empty_nodes(new_snvs)
+
+        #tree_depth = max(node.height for node in new_tree.node_list)
+        #print("tree depth ", tree_depth)
     
-        if tree_depth < min_depth:
+        """ if tree_depth < min_depth:
             # Tree too shallow, reject and keep old tree
             #print(f"  Warning: Rejected tree with depth {tree_depth} < {min_depth}")
-            return self.tree, self.tree.snvs
+            return self.tree, self.tree.snvs """
     
-        return new_tree, new_tree.snvs
+        return self.tree, self.tree.snvs
 
 
     def sample_snv_assignment(self, n, current_snvs, phi, bulk_snvs, scrna_data, epsilon):
@@ -255,6 +257,32 @@ def initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, alpha=1.0, scrna_params
 
     return tree, z, phi_sampler, phi 
 
+def initialize_prior_fixed_tree(lamb_0, lamb, gamma, num_snvs, alpha = 1.0, scrna_params = None):
+    node_list = []
+    root_node = Simplified_Node(None, None, 0, 0, True, 0)
+    progenitor_node = Simplified_Node(root_node, None, 0, 0, False, 1)
+    left_branch_node = Simplified_Node(progenitor_node, None, 0, 0, False, 2)
+    right_branch_node = Simplified_Node(progenitor_node, None, 0, 0, False, 2)
+    
+    root_node.children = [progenitor_node]
+    progenitor_node.children = [left_branch_node, right_branch_node]
+
+    node_list.extend([root_node, progenitor_node, left_branch_node, right_branch_node])
+
+    initialize_fixed_tree_snv_assignment(node_list, lamb_0, lamb, gamma)
+
+    z = assign_snvs(num_snvs, node_list)
+
+    tree = Tree(node_list, z)
+
+    if scrna_params is None:
+        scrna_params = ScRNALikelihoodParams()
+
+    phi_sampler = PhiSample(tree, alpha = alpha, scrna_params=scrna_params)
+    phi = phi_sampler.sample_prior()
+
+    return tree, z, phi_sampler, phi 
+
 def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, scrna_config, phi_sampler):
     
     log_bulk = bulk_log_likelihood(bulk_snvs, phi.tolist(), epsilon)
@@ -270,21 +298,21 @@ def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, sc
     return log_posterior, log_bulk, log_scrna, log_prior
 
 
-def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, burnin, scrna_config = None):
+def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, burnin, use_fixed_tree, scrna_config = None):
     t0 = time.time()
     num_snvs = len(bulk_snvs)
 
     if scrna_config is None:
         scrna_config = ScRNALikelihoodParams()
 
-    tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
-
-    tree_depth = max(node.height for node in tree.node_list)
-    
-    #reject any trees initialized with depth less than 3
-    while tree_depth < 3:
+    if use_fixed_tree:
+        tree, z, phi_sampler, phi = initialize_prior_fixed_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
+    else:
         tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
         tree_depth = max(node.height for node in tree.node_list)
+        while tree_depth < 2:
+            tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
+            tree_depth = max(node.height for node in tree.node_list)
 
     tree_sampler = TreeSampler(tree, scrna_config)
     
@@ -311,7 +339,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
          old_tree_k = tree.k
          old_tree_id = id(tree)  
 
-         new_tree, new_snvs = tree_sampler.slice_sample_tree(phi_temp, bulk_snvs, scrna_data, epsilon, 3)
+         new_tree, new_snvs = tree_sampler.slice_sample_tree(phi_temp, bulk_snvs, scrna_data, epsilon, 2)
          
          tree_changed = (id(new_tree) != old_tree_id) or (new_tree.k != old_tree_k)
 

@@ -144,3 +144,53 @@ def get_node_genotypes(node_list, z, node_index):
         current_node = current_node.parent
 
     return sorted(genotype)
+
+
+class Simplified_Node():
+    def __init__(self, parent, children, remaining_stick, pi, is_root, height):
+        self.parent = parent
+        self.children = children
+        self.remaining_stick = remaining_stick
+        self.pi_u = pi
+        self.is_root = is_root
+        self.height = height
+
+
+def initialize_fixed_tree_snv_assignment(node_list, lamb_0, lamb, gamma):
+    root_node = node_list[0]
+    node = root_node.children[0]
+    
+    upsilon_progenitor = 1
+    v_progenitor = np.random.beta(1, lamb_0 * math.pow(lamb, 1))
+    pi_progenitor = upsilon_progenitor * v_progenitor
+    remaining_stick = (1-pi_progenitor) * upsilon_progenitor
+    
+    node.pi_u = pi_progenitor
+    node.remaining_stick = remaining_stick
+
+
+    def tssb_recurse(node, lamb_0, lamb, gamma):
+        children = node.children
+        if not children:
+            return
+        
+        rs = node.remaining_stick
+
+        for child in children:
+            psi = np.random.beta(1, gamma)
+            upsilon_child = rs * psi
+            v_child = np.random.beta(1, lamb_0 * math.pow(lamb, child.height))
+
+            pi_child = upsilon_child * v_child
+            child.pi_u = pi_child
+            child.remaining_stick = upsilon_child * (1 - v_child)
+
+            rs = rs * (1 - psi)
+
+            tssb_recurse(child, lamb_0, lamb, gamma)
+
+
+    tssb_recurse(node, lamb_0, lamb, gamma)
+
+
+
