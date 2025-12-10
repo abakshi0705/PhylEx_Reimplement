@@ -291,7 +291,7 @@ def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, sc
     if scrna_data is not None:
         log_scrna = log_scrna_likelihood(scrna_data, phi.tolist(), clone_has_snv, scrna_config)
 
-    log_prior = phi_sampler.previous_log(phi)
+    log_prior = phi_sampler.prior_log(phi)
 
     log_posterior = log_bulk + log_scrna + log_prior
 

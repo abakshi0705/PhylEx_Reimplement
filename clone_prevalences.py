@@ -49,18 +49,18 @@ class PhiSample:
         self.alpha_param = alpha
 
         self.alpha = np.full(self.K, alpha)
-        self.phi = self.previous_sample()
+        self.phi = self.prior_sample()
         self.scrna_params = scrna_params
 
     """Initial sample from dirichlet prior"""
-    def previous_sample(self):
+    def prior_sample(self):
         # sample using the current tree size; ensure concentrations are strictly positive
         alpha_vec = np.full(self.K, self.alpha_param)
         alpha_vec = np.clip(alpha_vec, _ALPHA_EPS, None)
         return np.random.dirichlet(alpha_vec)
 
     """Computing the Dirichlet log prior for a given phi """
-    def previous_log(self, phi):
+    def prior_log(self, phi):
         # ensure alpha vector matches phi length and is strictly positive
         phi = np.asarray(phi)
         alpha_vec = np.full(len(phi), self.alpha_param)
@@ -107,8 +107,8 @@ class PhiSample:
         if S is not None:
             log_scrna_old = log_scrna_likelihood(S, phi, clone_has_snv, self.scrna_params)
             log_scrna_new = log_scrna_likelihood(S, phi_propose, clone_has_snv, self.scrna_params)
-        log_prior_old = self.previous_log(phi)
-        log_prior_new = self.previous_log(phi_propose)
+        log_prior_old = self.prior_log(phi)
+        log_prior_new = self.prior_log(phi_propose)
         log_accept = (log_bulk_new + log_scrna_new + log_prior_new) - (
             log_bulk_old + log_scrna_old + log_prior_old
         )
