@@ -17,12 +17,11 @@ DEFAULT_TOTAL_READS = 10
 DEFAULT_MAJOR_CN = 1
 DEFAULT_MINOR_CN = 1
 
-
-def load_bulk_snvs(tree0_dir):
-    """
+"""
     Load bulk SNVs from genotype_ssm.txt, which has columns:
     ID, CHR, POS, REF, ALT, b, d, major_cn, minor_cn.
     """
+def load_bulk_snvs(tree0_dir):
     bulk_path = os.path.join(tree0_dir, "genotype_ssm.txt")      
     df = pd.read_csv(bulk_path, sep="\t")                        
 
@@ -53,6 +52,9 @@ def load_bulk_snvs(tree0_dir):
             )
         )
     return snvs
+
+""" def loadscRNAseqData(tree0_dir):
+    scrna_path = os.path.join(tree0_dir, "simul_ssm.txt") """
 
 
 def load_true_snvs(tree0_dir):
