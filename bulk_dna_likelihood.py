@@ -4,16 +4,29 @@ import math
 
 class SNV:
     # Single SNV in bulk data.
+    """
+        Each SNV has certain properties, including:
+            variant_reads: number of reads supporing the variant allele
+            total_reads: total read depth
+            major_cn: major copy number (baseline/most common copy number for a genomic region)
+            minor_cn: minor copy number (indicate a gain or loss from major state)
+            clone_index: which clone this SNV is assigned to in z_n
+            id: id of this SNV from the sample data; defaults to none
+    """
     def __init__(self, variant_reads, total_reads, major_cn, minor_cn, clone_index):
-        self.variant_reads = variant_reads #number of reads supporing the variant allele
-        self.total_reads = total_reads #total read depth
-        self.major_cn = major_cn #the major copy numbers
-        self.minor_cn = minor_cn #the minor copy numbers
-        self.clone_index = clone_index #which clone this SNV is assigned to z_n
+        self.variant_reads = variant_reads 
+        self.total_reads = total_reads 
+        self.major_cn = major_cn 
+        self.minor_cn = minor_cn 
+        self.clone_index = clone_index 
+        self.id = ""
+
 
 
 class Genotype:
-    # Genotype with total copies c and variant copies v. So for instance if c = 2, v = 1 then we have one reference and one variant
+    """
+        Genotype with total copies c and variant copies v. So for instance if c = 2, v = 1 then we have one reference and one variant
+    """
     def __init__(self, total_copies, variant_copies):
         self.total_copies = total_copies
         self.variant_copies = variant_copies

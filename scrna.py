@@ -1,7 +1,7 @@
 """
 scRNA-seq Likelihood Module
 
-This file computes the scRNA-seq likelihood term log p(S | T, z, phi)
+Methods in this file will compute the scRNA-seq likelihood term log p(S | T, z, phi)
 
 It models:
 - allelic imbalance using a Beta-Binomial mixture
@@ -64,6 +64,7 @@ class ScRNALikelihoodParams:
     Holds the hyperparameters for the Beta-Binomial mixture model.
     these are the hyperparameters that were provided in the supplementary file
 
+    We use these to initialize default parameters 
     These define:
     - mono-allelic expression
     - bi-allelic expression

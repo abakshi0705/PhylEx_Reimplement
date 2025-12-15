@@ -6,7 +6,7 @@ import math
 
 class Node():
     """
-        parent: the parent of this node
+        parent: the parent node of this node
         upsilon_u: the portion of the stick available to be broken up by the node
         remaining_stick: the portion of the stick that remains after this node breaks off its piece
         is_root: if the node is the root or not
@@ -29,9 +29,9 @@ class Node():
 """
 gets list of nodes for a specific tree, based on parameters lamb_0, lamb, gamma
 
-requires 0 < lamb_0
-requires 0 < lamb <=1
-requires gamma > 0  
+    requires 0 < lamb_0
+    requires 0 < lamb <=1
+    requires gamma > 0  
 """
 def get_node_list(lamb_0, lamb, gamma):
     node_list = []  
@@ -59,11 +59,11 @@ def get_node_list(lamb_0, lamb, gamma):
 
 """ 
 Recursive helper function that generates all the children of a given node, and those childrens' nodes until
-remaining stick is smaller than a threshold value.
+remaining stick is smaller than a threshold value (0.005).
 
-requires 0 < lamb_0
-requires 0 < lamb <=1
-requires gamma > 0  
+    requires 0 < lamb_0
+    requires 0 < lamb <=1
+    requires gamma > 0  
 """
 def tssb(node, lamb_0, lamb, gamma):
     k = 0
@@ -93,8 +93,8 @@ def tssb(node, lamb_0, lamb, gamma):
 
 """
 Assign SNVs to a clone
-n: number of snvs
-
+    n: number of snvs
+    node_list: list of all nodes in a given tree
 the probability of an snv being assigned to a clone is equal to that clones pi value, which was found in the tssb algorithm
 """
 def assign_snvs(n, node_list):
@@ -120,7 +120,7 @@ def assign_snvs(n, node_list):
         )
     pi_values = pi_values / total
 
-    # randomly a node based on the pi_value for that node to assign an SNV to
+    # randomly select a node based on the pi_value for that node to assign an SNV to
     # index of z represents SNV number
     z = np.random.choice(non_root_indices, size=n, p=pi_values)
 
@@ -134,7 +134,7 @@ def get_snvs_for_node(z, node_index):
     return [n for n, assigned_node in enumerate(z) if assigned_node == node_index]
 
 
-# gets a list of all SNV indices present at a specific node, including the ancestral SNVs
+""" gets a list of all SNV indices present at a specific node, including the ancestral SNVs """
 def get_node_genotypes(node_list, z, node_index):
     genotype = []
     current_node = node_list(node_index)
@@ -146,6 +146,19 @@ def get_node_genotypes(node_list, z, node_index):
     return sorted(genotype)
 
 
+"""
+We created this SimplifiedNode class to be used when generating a tree who's structure is already known;
+The difference between a SimplifiedNode and regular node is that this has a field for the children of a given node
+as we know how many children a node has given teh fixed tree structure 
+
+    parent: the parent node of this node
+    children: a list of nodes containing all the children of this node
+    remaining_stick: the portion of the stick that remains after this node breaks off its piece
+    pi_u: the amount of the stick that is assigned to this node
+    is_root: if the node is the root or not
+    height: the height of this node in the tree
+
+"""
 class Simplified_Node():
     def __init__(self, parent, children, remaining_stick, pi, is_root, height):
         self.parent = parent
@@ -155,7 +168,14 @@ class Simplified_Node():
         self.is_root = is_root
         self.height = height
 
+"""
+This method performs a modified version of the TSSB algorithm where we assign pi_values to nodes in a tree with a
+fixed structure.
 
+    requires 0 < lamb_0
+    requires 0 < lamb <=1
+    requires gamma > 0
+"""
 def initialize_fixed_tree_snv_assignment(node_list, lamb_0, lamb, gamma):
     root_node = node_list[0]
     node = root_node.children[0]

@@ -7,7 +7,15 @@ from bulk_dna_likelihood import SNV, bulk_log_likelihood, snv_log_likelihood
 from scrna import log_scrna_likelihood, ScRNALikelihoodParams, log_likelihood_cell_given_clone
 import time
 
+"""
+Tree class will hold:
+    node_list: a list of all the nodes in the tree, including the non-cancerous root node
+    snvs: is a list with size equal to the number of snvs; snvs[i] will hold the clone that the ith snv is assigned to
 
+    nodes_except_root: a list of all nodes in the tree excluding the non-cancerous root node; made because it integrates better
+        with how clone_prevalences was setup
+    k: length of nodes_except_root
+"""
 class Tree:
     def __init__(self, node_list, snvs):
         #the full list of all nodes in the tree, including the non-cancerous root node
@@ -17,7 +25,7 @@ class Tree:
         #all the nodes in the tree excluding the non-cancerous root node
         self.nodes_except_root = [node for node in node_list if not node.is_root]
         self.k = len(self.nodes_except_root)
-    
+
     def __eq__(self, other):
         if not isinstance(other, Tree):
             return False
@@ -36,7 +44,7 @@ class Tree:
     
     def to_newick(self):
         node_to_index = {node: i for i, node in enumerate(self.node_list)}
-               # Build children adjacency
+        #build child adjacency matrix
         children = {i: [] for i in range(len(self.node_list))}
         root_index = None
 
@@ -59,8 +67,13 @@ class Tree:
 
         return build_subtree(root_index) + ";"
     
+"""
+TreeSampler is a class for slice sampling a tree; we use this to explore SNV assignment in the tree
+the TreeSampler holds:
+    tree: the tree for which SNV assignment is being explored
+    scrna_params: any scrna parameters that were initially loaded into the progroam
 
-#class for slice sampling a tree; we use this to explore the tree space
+"""
 class TreeSampler:
     def __init__(self, tree, scrna_params=None):
         self.tree = tree
@@ -76,13 +89,17 @@ class TreeSampler:
         
         self.tree.snvs = new_snvs
 
-        #create a new tree with the new_snvs
-        #new_tree = self.prune_empty_nodes(new_snvs)
+        #We created this code with an older implementation of our TSSB algorithm which generated not only
+        #a prior distribution for SNV assignment, but also for the structure of our tree
+        #in this case, we wanted to prune our tree structures if they ever had nodes with no snv assignment,
+        #as our original TSSB implementation could sometimes generate a prior tree that was very large
+        """ #create a new tree with the new_snvs
+        new_tree = self.prune_empty_nodes(new_snvs)
 
-        #tree_depth = max(node.height for node in new_tree.node_list)
-        #print("tree depth ", tree_depth)
+        tree_depth = max(node.height for node in new_tree.node_list)
+        print("tree depth ", tree_depth)
     
-        """ if tree_depth < min_depth:
+        if tree_depth < min_depth:
             # Tree too shallow, reject and keep old tree
             #print(f"  Warning: Rejected tree with depth {tree_depth} < {min_depth}")
             return self.tree, self.tree.snvs """
@@ -137,7 +154,7 @@ class TreeSampler:
 
         #get the probability for the snv being assigned to this node
         node = self.tree.node_list[node_index]
-        old_log = np.log(node.pi_u + 1e-10)
+        old_log = np.log(node.pi_u + 1e-10) #add 1e-10 in case pi_u is 0
 
         #adjust the snv assignment list so that it represents clone indices (excludes root indices)
         snv_clone_temp = adjust_z(snvs_temp, self.tree)
@@ -157,6 +174,8 @@ class TreeSampler:
     """
     removes any nodes with no SNVs assigned to it and whos descendants have no snvs assigned to them
     """
+    #note, we don't end up using this method in our current implementation; however we left it here in case we wanted
+    #switch back to using the older implementation. 
     def prune_empty_nodes(self, new_snvs):
         snv_counts = {i: 0 for i in range(len(self.tree.node_list))}
         
@@ -226,7 +245,7 @@ def check_if_descendant(current_node, ancestor_node):
     return False
 
 """
-updates SNV assignment for bulk DNA data 
+updates SNV assignment for bulk DNA data
 """
 def update_bulk_snvs_indices(bulk_snvs, z_updated):
     updated_snvs = []
@@ -242,6 +261,17 @@ def update_bulk_snvs_indices(bulk_snvs, z_updated):
     return updated_snvs
 
 
+"""
+This function will initialize a prior tree with the original implementation of our TSSB algorithm, which
+generates a prior tree of arbitrary size
+Also initializes a prior distribution for cellular prevalences
+
+returns:
+    tree - tree
+    z - SNV assignments to clones in the tree
+    phi_sampler - an object used to sample phi (cellular prevalence) values using Metropolis Hastings
+    phi - an array containing cellular prevalence values for each clone
+"""
 def initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, alpha=1.0, scrna_params = None):
     node_list = get_node_list(lamb_0, lamb, gamma)
 
@@ -257,6 +287,18 @@ def initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, alpha=1.0, scrna_params
 
     return tree, z, phi_sampler, phi 
 
+"""
+This function will initialize a tree that already has a known prior structure (in this case a cherry shaped tree)
+important note: trees with known prior structure will use a Simplified_Node, which contains a field for the nodes children since
+    these are known before hand; this is necessary to work with our refined implementation of TSSB
+
+returns:
+    tree - tree
+    z - SNV assignments to clones in the tree
+    phi_sampler - an object used to sample phi (cellular prevalence) values using Metropolis Hastings
+    phi - an array containing cellular prevalence values for each clone
+"""
+
 def initialize_prior_fixed_tree(lamb_0, lamb, gamma, num_snvs, alpha = 1.0, scrna_params = None):
     node_list = []
     root_node = Simplified_Node(None, None, 0, 0, True, 0)
@@ -269,6 +311,7 @@ def initialize_prior_fixed_tree(lamb_0, lamb, gamma, num_snvs, alpha = 1.0, scrn
 
     node_list.extend([root_node, progenitor_node, left_branch_node, right_branch_node])
 
+    #note use of different initializer
     initialize_fixed_tree_snv_assignment(node_list, lamb_0, lamb, gamma)
 
     z = assign_snvs(num_snvs, node_list)
@@ -283,6 +326,7 @@ def initialize_prior_fixed_tree(lamb_0, lamb, gamma, num_snvs, alpha = 1.0, scrn
 
     return tree, z, phi_sampler, phi 
 
+"""Computes the posterior probability for a tree given our updated phi samples"""
 def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, scrna_config, phi_sampler):
     
     log_bulk = bulk_log_likelihood(bulk_snvs, phi.tolist(), epsilon)
@@ -291,15 +335,15 @@ def compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, sc
     if scrna_data is not None:
         log_scrna = log_scrna_likelihood(scrna_data, phi.tolist(), clone_has_snv, scrna_config)
 
-    log_prior = phi_sampler.previous_log(phi)
+    log_prior = phi_sampler.prior_log(phi)
 
     log_posterior = log_bulk + log_scrna + log_prior
 
     return log_posterior, log_bulk, log_scrna, log_prior
 
-
-def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, burnin, use_fixed_tree, scrna_config = None):
-    t0 = time.time()
+"""This is the main part of the algorithm; we use MCMC to explore SNV and cellular prevalence assignments"""
+def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, burnin, use_fixed_tree, scrna_config = None, phi_init = None):
+    #t0 = time.time()
     num_snvs = len(bulk_snvs)
 
     if scrna_config is None:
@@ -307,7 +351,11 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
 
     if use_fixed_tree:
         tree, z, phi_sampler, phi = initialize_prior_fixed_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
+        if phi_init is not None:
+            phi = phi_init.copy()
     else:
+        #if using an unfixed tree, we want to enforce a minimum tree depth so that our prior tree doesn't initialize with 1 node
+        #we do this because our tree structure can only shrink (through the prune function), not grow
         tree, z, phi_sampler, phi = initialize_prior_tree(lamb_0, lamb, gamma, num_snvs, 1.0, scrna_config)
         tree_depth = max(node.height for node in tree.node_list)
         while tree_depth < 2:
@@ -315,25 +363,45 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
             tree_depth = max(node.height for node in tree.node_list)
 
     tree_sampler = TreeSampler(tree, scrna_config)
+
+    chain_of_trees = []
     
+    #map_tree holds the maximum a posteriori tree, along with its associated snv and cell prev. assignments, and posterior prob.
     map_tree = {"tree": tree, "phi": phi, "z": z, "log_posterior": -math.inf}
 
     for i in range(num_iterations):
-         #print ("MCMC loop ", i)
-         z_clone = adjust_z(tree.snvs, tree)
-         t1 = time.time() 
-         #print("adjust_z time:", t1 - t0)
+         if i % 5 == 0:
+             print ("MCMC loop ", i)
+         #old_tree_k = tree.k
+         #old_tree_id = id(tree)
+         
+         new_tree, new_snvs = tree_sampler.slice_sample_tree(phi, bulk_snvs, scrna_data, epsilon, 2)
+         #tree = tree_sampler.slice_sample_tree(phi, bulk_snvs, scrna_data, epsilon, 2)
+         
+         #tree_changed = (id(new_tree) != old_tree_id) or (new_tree.k != old_tree_k)
+         tree = new_tree
 
+         phi_sampler.tree = tree
+         phi_sampler.K = tree.k
+
+         z_clone = adjust_z(tree.snvs, tree)
          bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
-         t2 = time.time() 
-         #print("update_bulk_snvs_indices time:", t2 - t1)
+         clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
+
+         phi = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
+
+
+
+         """  #first adjust our SNV assignment index so that it works with the phi_sampler
+         old_tree_k = tree.k
+         old_tree_id = id(tree)
+
+         z_clone = adjust_z(tree.snvs, tree)
+         bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
+         
 
          clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
-         t3 = time.time() 
-         #print("make_clone_has_snv_matrix time:", t3 - t2)
-
-         #print("total pre-iteration time:", t3 - t0)
-
+     
          phi_temp = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
 
          old_tree_k = tree.k
@@ -350,12 +418,13 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
          else:
              #print("reached b")
              phi = phi_temp
-             tree = new_tree
+             tree = new_tree """
 
-         tree_sampler.tree = tree
+         #tree_sampler.tree = tree
         
-         phi_sampler.tree = tree
-         phi_sampler.K = tree.k
+         #phi_sampler.tree = tree
+         #phi_sampler.K = tree.k
+
 
          if len(phi) != tree.k:
             # Adjust phi to match new tree size
@@ -370,11 +439,19 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
                 phi = phi[:tree.k]
                 phi = phi / np.sum(phi)  # Renormalize
         
-         z_clone = adjust_z(tree.snvs, tree)
+
+         """ z_clone = adjust_z(tree.snvs, tree)
          bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
-         clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
+         clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs) """
         
+         
+
          log_post, log_bulk, log_scrna, log_prior = compute_log_posterior(phi, bulk_snvs_updated, scrna_data, clone_has_snv, epsilon, scrna_config, phi_sampler)
+
+         sampled_tree = {"tree": tree, "phi": phi.copy(), "z": tree.snvs.copy(), "log_posterior": log_post,
+                         "log_bulk": log_bulk, "log_scrna": log_scrna, "log_prior": log_prior}
+         
+         chain_of_trees.append(sampled_tree)
 
          if log_post > map_tree["log_posterior"]:
              map_tree["tree"] = tree
@@ -384,40 +461,75 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
     
     print(f"MAP log posterior: {map_tree['log_posterior']:.2f}")
 
-    return map_tree
+    return map_tree, chain_of_trees
 
 
-""" 
-#TEST ON SMALL, SYNTHETIC DATA
-
-if __name__ == "__main__":
-    # Example: Create synthetic data and run MCMC
-    from bulk_dna_likelihood import SNV
+def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, scrna_config = None, phi_init = None):
+    num_snvs = len(bulk_snvs)
+    if scrna_config is None:
+        scrna_config = ScRNALikelihoodParams()
     
-    # Create example bulk SNVs
-    bulk_snvs = [
-        SNV(15, 100, 1, 1, 0),
-        SNV(30, 100, 2, 1, 0),
-        SNV(25, 100, 1, 1, 0),
-        SNV(10, 80, 1, 0, 0),
-        SNV(20, 90, 1, 1, 0),
-    ]
+    #initialize a prior fixed tree
+    node_list = []
+    root_node = Simplified_Node(None, None, 0, 0, True, 0)
+    progenitor_node = Simplified_Node(root_node, None, 0, 0, False, 1)
+    left_branch_node = Simplified_Node(progenitor_node, None, 0, 0, False, 2)
+    right_branch_node = Simplified_Node(progenitor_node, None, 0, 0, False, 2)
     
-    # Run MCMC
-    map_result = mcmc(
-        bulk_snvs=bulk_snvs,
-        scrna_data=None,  # No scRNA data for this example
-        lamb_0=1.0,
-        lamb=0.5,
-        gamma=1.0,
-        epsilon=0.001,
-        num_iterations=1000,
-        burnin=500
-    )
-    
-    print(f"\nMAP Tree has {map_result['tree'].k} clones")
-    print(f"MAP phi: {map_result['phi']}")
-    print(f"MAP log posterior: {map_result['log_posterior']:.2f}")
+    root_node.children = [progenitor_node]
+    progenitor_node.children = [left_branch_node, right_branch_node]
 
-def main():
-    pass """
+    node_list.extend([root_node, progenitor_node, left_branch_node, right_branch_node])
+
+    fixed_tree = Tree(node_list=node_list, snvs=z)
+
+    #initialize phi
+    if phi_init is not None:
+        phi = phi_init.copy()
+
+    phi_sampler = PhiSample(fixed_tree, alpha = 1.0, scrna_params=scrna_config)
+
+    chain_of_trees = []
+    map_tree = {"tree": fixed_tree, "phi": phi, "z": z, "log_posterior": -math.inf}
+
+    clone_has_snv = make_clone_has_snv_matrix(fixed_tree.snvs, fixed_tree, num_snvs)
+
+    for i in range(num_iterations):
+         if i % 5 == 0:
+             print ("MCMC loop ", i)
+
+         phi = phi_sampler.update(phi, bulk_snvs, epsilon, scrna_data, clone_has_snv)
+
+         if len(phi) != fixed_tree.k:
+                # Adjust phi to match new tree size
+                if fixed_tree.k > len(phi):
+                    # Tree grew, add new clone prevalences
+                    new_phi = np.zeros(fixed_tree.k)
+                    new_phi[:len(phi)] = phi * (1 - 0.1)  # Shrink existing
+                    new_phi[len(phi):] = 0.1 / (fixed_tree.k - len(phi))  # New clones
+                    phi = new_phi
+                else:
+                    # Tree shrunk, remove clones
+                    phi = phi[:fixed_tree.k]
+                    phi = phi / np.sum(phi)  # Renormalize
+     
+
+         log_post, log_bulk, log_scrna, log_prior = compute_log_posterior(phi, bulk_snvs, scrna_data, clone_has_snv, epsilon, scrna_config, phi_sampler)
+
+         sampled_tree = {"tree": fixed_tree, "phi": phi.copy(), "z": fixed_tree.snvs.copy(), "log_posterior": log_post,
+                            "log_bulk": log_bulk, "log_scrna": log_scrna, "log_prior": log_prior}
+            
+         chain_of_trees.append(sampled_tree)
+
+         if log_post > map_tree["log_posterior"]:
+            map_tree["tree"] = fixed_tree
+            map_tree["phi"] = phi.copy()
+            map_tree["z"] = fixed_tree.snvs.copy()
+            map_tree["log_posterior"] = log_post
+        
+    print(f"MAP log posterior: {map_tree['log_posterior']:.2f}")
+
+    return map_tree, chain_of_trees
+    
+
+    

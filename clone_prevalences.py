@@ -3,13 +3,14 @@ from math import lgamma
 from scrna import log_scrna_likelihood, ScRNALikelihoodParams
 from bulk_dna_likelihood import bulk_log_likelihood
 
-""" Computing the log density of a dirichlet distriubtion, using the formula: 
-log p(phi | alpha) = lgamma(sum(alpha)) - sum(lgamma(alpha_i)) + sum((alpha_i -1) * log(phi_1))
-This is the prior over clone prevalences.  """
 
 # Small floor to keep Dirichlet concentration parameters strictly positive
 _ALPHA_EPS = 1e-8
 
+
+""" Computing the log density of a dirichlet distriubtion, using the formula: 
+log p(phi | alpha) = lgamma(sum(alpha)) - sum(lgamma(alpha_i)) + sum((alpha_i -1) * log(phi_1))
+This is the prior over clone prevalences.  """
 
 def dirichlet_log(phi, alpha):
     phi = np.asarray(phi)
@@ -49,18 +50,18 @@ class PhiSample:
         self.alpha_param = alpha
 
         self.alpha = np.full(self.K, alpha)
-        self.phi = self.previous_sample()
+        self.phi = self.prior_sample()
         self.scrna_params = scrna_params
 
     """Initial sample from dirichlet prior"""
-    def previous_sample(self):
+    def prior_sample(self):
         # sample using the current tree size; ensure concentrations are strictly positive
         alpha_vec = np.full(self.K, self.alpha_param)
         alpha_vec = np.clip(alpha_vec, _ALPHA_EPS, None)
         return np.random.dirichlet(alpha_vec)
 
     """Computing the Dirichlet log prior for a given phi """
-    def previous_log(self, phi):
+    def prior_log(self, phi):
         # ensure alpha vector matches phi length and is strictly positive
         phi = np.asarray(phi)
         alpha_vec = np.full(len(phi), self.alpha_param)
@@ -77,7 +78,7 @@ class PhiSample:
       We scale phi by a step facotr so that most proposals stay close to the current value,
      which helps the MCMC explore the space smoothly without making huge jumps."""
 
-    def propose(self, phi, step=50):
+    def propose(self, phi, step=5):
         # form proposal concentration parameters centered on current phi
         phi = np.asarray(phi)
         alpha_prop = phi * step
@@ -88,7 +89,7 @@ class PhiSample:
     """
     Run one update step of the Metropolis Hastings sampler for phi.
     Generate a new phi and compute its posterior probability using the bulk DNA likelihood, scRNA likelihood,
-    and the DiRichlet prior over phi.
+    and the Dirichlet prior over phi.
     The proposal is accepted with the standard MH acceptance probability. 
     The parameters are defined as follows: 
     
@@ -107,11 +108,18 @@ class PhiSample:
         if S is not None:
             log_scrna_old = log_scrna_likelihood(S, phi, clone_has_snv, self.scrna_params)
             log_scrna_new = log_scrna_likelihood(S, phi_propose, clone_has_snv, self.scrna_params)
-        log_prior_old = self.previous_log(phi)
-        log_prior_new = self.previous_log(phi_propose)
-        log_accept = (log_bulk_new + log_scrna_new + log_prior_new) - (
-            log_bulk_old + log_scrna_old + log_prior_old
-        )
+        log_prior_old = self.prior_log(phi)
+        log_prior_new = self.prior_log(phi_propose)
+        
+        log_post_old = log_bulk_old + log_scrna_old + log_prior_old
+        log_post_new = log_bulk_new + log_scrna_new + log_prior_new
+
+        #add in Hastings Correction
+        log_forward = dirichlet_log(phi_propose, phi * 5)
+        log_reverse = dirichlet_log(phi, phi_propose * 5)
+
+        log_accept = (log_post_new - log_post_old + log_reverse - log_forward)
+
         if np.log(np.random.rand()) < log_accept:
             return phi_propose
 
