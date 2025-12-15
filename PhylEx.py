@@ -465,6 +465,9 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
 
 
 def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, scrna_config = None, phi_init = None):
+    #tracks how many times we accept proposed phi values
+    accepted = 0
+
     num_snvs = len(bulk_snvs)
     if scrna_config is None:
         scrna_config = ScRNALikelihoodParams()
@@ -498,7 +501,9 @@ def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, scrna_conf
          if i % 5 == 0:
              print ("MCMC loop ", i)
 
-         phi = phi_sampler.update(phi, bulk_snvs, epsilon, scrna_data, clone_has_snv)
+         phi, accept = phi_sampler.update(phi, bulk_snvs, epsilon, scrna_data, clone_has_snv)
+         if accept:
+             accepted += 1
 
          if len(phi) != fixed_tree.k:
                 # Adjust phi to match new tree size
@@ -528,6 +533,8 @@ def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, scrna_conf
             map_tree["log_posterior"] = log_post
         
     print(f"MAP log posterior: {map_tree['log_posterior']:.2f}")
+    acceptance_rate = float(accepted) / float(num_iterations)
+    print("Acceptance rate:", acceptance_rate)
 
     return map_tree, chain_of_trees
     

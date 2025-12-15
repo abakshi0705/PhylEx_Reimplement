@@ -35,8 +35,6 @@ class PhiSample:
     def __init__(self, tree, alpha=1.0, scrna_params=None):
         self.tree = tree
         self.K = len(tree.nodes_except_root)
-        print("K = ", self.K, type(self.K))
-        print("alpha = ", alpha, type(alpha))
         # keep the original alpha parameter and construct alpha vectors on demand
         # validate alpha (must be > 0)
         if np.isscalar(alpha):
@@ -78,7 +76,7 @@ class PhiSample:
       We scale phi by a step facotr so that most proposals stay close to the current value,
      which helps the MCMC explore the space smoothly without making huge jumps."""
 
-    def propose(self, phi, step=5):
+    def propose(self, phi, step=50):
         # form proposal concentration parameters centered on current phi
         phi = np.asarray(phi)
         alpha_prop = phi * step
@@ -115,15 +113,20 @@ class PhiSample:
         log_post_new = log_bulk_new + log_scrna_new + log_prior_new
 
         #add in Hastings Correction
-        log_forward = dirichlet_log(phi_propose, phi * 5)
-        log_reverse = dirichlet_log(phi, phi_propose * 5)
+        alpha_forward = np.clip(phi * 50, _ALPHA_EPS, None)
+        alpha_reverse = np.clip(phi_propose * 50, _ALPHA_EPS, None)
+
+        log_forward = dirichlet_log(phi_propose, alpha_forward)
+        log_reverse = dirichlet_log(phi, alpha_reverse)
 
         log_accept = (log_post_new - log_post_old + log_reverse - log_forward)
-
+        
+        accept = False
         if np.log(np.random.rand()) < log_accept:
-            return phi_propose
+            accept = True 
+            return phi_propose, accept
 
-        return phi
+        return phi, accept
 
     """ 
     Given an assignment vector z[n] = clone index of SNV n, return an array snv_phi[n]= phi[z[n]]

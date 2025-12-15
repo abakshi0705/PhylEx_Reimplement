@@ -326,7 +326,7 @@ def run_mcmc_fixed_snvs(tree0_dir):
     print("Seed:", seed, "phi_init:", phi_init[:3])
 
     map_tree, chain = mcmc_fixed_snv(bulk_snvs=bulk_snvs, scrna_data=S, epsilon=0.001, 
-                                              num_iterations=1000000, z=z, scrna_config=None, phi_init=phi_init)
+                                              num_iterations=1000, z=z, scrna_config=None, phi_init=phi_init)
     
     filename = f"chain{chain_id}.pkl"
     print(f"Saving chain {chain_id} to {filename}")
