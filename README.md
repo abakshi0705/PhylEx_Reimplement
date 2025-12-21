@@ -1,4 +1,22 @@
+## Running PhylEx Reimplementations
+To run the first version of the reimplementation (with default parameters):
+1. Go to run_simulation.py
+2. ensure line #453 is not commented; Run the simulation to generate 1 MCMC chain
+3. In order to generate multiple chains, use run_mcmc.sh on BioHPC; to adjust the number of iterations and burnin, adjust num_iterations and burnin on line 329
+Chains are saved as pickle files
 
+To run the second version of the reimplementation (with default parameters):
+1. Go to run_simulation.py
+2. Ensure line #453 is commented and line #454 is uncommented; Run the simulation to generate 1 MCMC chain
+3. In order to generate multiple chains, use run_mcmc.sh on BioHPC; to adjust number of iterations and burnin, adjust num_iterations and burnin on lines 259, 260
+Chains are saved as pickle files
+
+To analyze chain convergence:
+1. Add pickle files to one directory
+2. In analyze_convergence.py, adjust pickle_dir so that it reflects this directory
+3. Run analyze_convergence.py
+
+##Project Description
 
 PhylEx is a Bayesian phylogenetic inference framework for reconstructing tumor evolution from bulk DNA sequencing and single-cell RNA sequencing (scRNA-seq) data. The method infers clonal tree structure (the phylogenetic tree representing tumor evolution), SNV assignments (which mutations belong to which clones), and clone prevalences (the cellular prevalence or frequency of each clone in the tumor).
 
