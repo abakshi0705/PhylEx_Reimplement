@@ -1,4 +1,6 @@
-## Running PhylEx Reimplementations
+## Running PhylEx Reimplementations - IMPORTANT: Please download code from WORKING rather than MAIN
+I ran into some issues trying to merge the branch.
+
 To run the first version of the reimplementation (with default parameters):
 1. Go to run_simulation.py
 2. ensure line #453 is not commented; Run the simulation to generate 1 MCMC chain
