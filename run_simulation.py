@@ -257,7 +257,7 @@ def run_mcmc_single(tree0_dir, seed):
         gamma=5.0,
         epsilon=0.001,
         num_iterations=100000,
-        burnin=250,
+        burnin=20000,
         use_fixed_tree=True,
         phi_init=phi_init
     )
@@ -326,7 +326,7 @@ def run_mcmc_fixed_snvs(tree0_dir):
     print("Seed:", seed, "phi_init:", phi_init[:3])
 
     map_tree, chain = mcmc_fixed_snv(bulk_snvs=bulk_snvs, scrna_data=S, epsilon=0.001, 
-                                              num_iterations=1000, z=z, scrna_config=None, phi_init=phi_init)
+                                              num_iterations=1000000, z=z, burnin = 200000, scrna_config=None, phi_init=phi_init)
     
     filename = f"chain{chain_id}.pkl"
     print(f"Saving chain {chain_id} to {filename}")
@@ -450,8 +450,8 @@ def build_cluster_labels_from_datum2node(tree0_dir, out_name="cluster_labels_fro
 
 if __name__ == "__main__":
     print ("Reached Main")
-    chain = run_mcmc_fixed_snvs(TREE0_DIR)
-    #chain = run_parallel_chains(TREE0_DIR, num_chains=4, save_to_disk=True)
+    #chain = run_mcmc_fixed_snvs(TREE0_DIR)
+    chain = run_parallel_chains(TREE0_DIR, num_chains=4, save_to_disk=True)
     
 
     # map_result = run_mcmc_single(TREE0_DIR)

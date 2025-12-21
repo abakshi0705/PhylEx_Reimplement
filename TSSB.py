@@ -146,20 +146,21 @@ def get_node_genotypes(node_list, z, node_index):
     return sorted(genotype)
 
 
-"""
-We created this SimplifiedNode class to be used when generating a tree who's structure is already known;
-The difference between a SimplifiedNode and regular node is that this has a field for the children of a given node
-as we know how many children a node has given teh fixed tree structure 
 
-    parent: the parent node of this node
-    children: a list of nodes containing all the children of this node
-    remaining_stick: the portion of the stick that remains after this node breaks off its piece
-    pi_u: the amount of the stick that is assigned to this node
-    is_root: if the node is the root or not
-    height: the height of this node in the tree
-
-"""
 class Simplified_Node():
+    """
+        We created this SimplifiedNode class to be used when generating a tree who's structure is already known;
+        The difference between a SimplifiedNode and regular node is that this has a field for the children of a given node
+        as we know how many children a node has given teh fixed tree structure 
+
+            parent: the parent node of this node
+            children: a list of nodes containing all the children of this node
+            remaining_stick: the portion of the stick that remains after this node breaks off its piece
+            pi_u: the amount of the stick that is assigned to this node
+            is_root: if the node is the root or not
+            height: the height of this node in the tree
+
+    """
     def __init__(self, parent, children, remaining_stick, pi, is_root, height):
         self.parent = parent
         self.children = children

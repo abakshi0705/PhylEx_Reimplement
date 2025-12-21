@@ -15,6 +15,9 @@ This is the prior over clone prevalences.  """
 def dirichlet_log(phi, alpha):
     phi = np.asarray(phi)
     phi = np.clip(phi, 1e-12, 1.0)  # prevents log(0)
+
+    phi = phi/(phi.sum())
+
     alpha = np.asarray(alpha)
     if np.any(alpha <= 0):
         raise ValueError("dirichlet_log: all alpha concentrations must be > 0")
@@ -32,7 +35,7 @@ so we set alpha=1.0 for each clone.
 """
 
 class PhiSample:
-    def __init__(self, tree, alpha=1.0, scrna_params=None):
+    def __init__(self, tree, alpha=1.0, scrna_params=None, step = 400):
         self.tree = tree
         self.K = len(tree.nodes_except_root)
         # keep the original alpha parameter and construct alpha vectors on demand
@@ -50,6 +53,8 @@ class PhiSample:
         self.alpha = np.full(self.K, alpha)
         self.phi = self.prior_sample()
         self.scrna_params = scrna_params
+        self.step = step
+        self.t_step = 1
 
     """Initial sample from dirichlet prior"""
     def prior_sample(self):
@@ -76,13 +81,33 @@ class PhiSample:
       We scale phi by a step facotr so that most proposals stay close to the current value,
      which helps the MCMC explore the space smoothly without making huge jumps."""
 
-    def propose(self, phi, step=50):
+    def propose(self, phi, step = None):
+        if step == None:
+            step = self.step
+
         # form proposal concentration parameters centered on current phi
         phi = np.asarray(phi)
-        alpha_prop = phi * step
+        min_conc = 1e-12
         # ensure all entries > 0 for Dirichlet sampling
-        alpha_prop = np.clip(alpha_prop, _ALPHA_EPS, None)
+        alpha_prop = np.clip(phi * step, min_conc, None)
         return np.random.dirichlet(alpha_prop)
+
+    def hastings(self, phi, phi_new, step = None):
+        if step == None:
+            step = self.step
+        min_conc = 1e-12
+        alpha_forward = np.clip(phi * step, min_conc, None)
+        alpha_reverse = np.clip(phi_new * step, min_conc, None)
+
+        log_forward = dirichlet_log(phi_new, alpha_forward)
+        log_reverse = dirichlet_log(phi, alpha_reverse)
+
+        return log_reverse - log_forward
+    
+    def adapt_step(self, accepted, target=0.3):
+        eta = 0.05
+        self.step *= np.exp(eta * (accepted - target))
+        self.step = np.clip(self.step, 20, 2000)
 
     """
     Run one update step of the Metropolis Hastings sampler for phi.
@@ -97,33 +122,37 @@ class PhiSample:
     S: per-cell scRNA seq read counts
     clone_has_snv: boolean matrix including mutation inheritance 
     """
-    def update(self, phi, snvs, epsilon, S, clone_has_snv):
-        phi_propose = self.propose(phi)
+    def update(self, phi, snvs, epsilon, S, clone_has_snv, is_burnin, step = 400):
+        phi_propose = self.propose(phi, self.step)
+
         log_bulk_old = bulk_log_likelihood(snvs, phi, epsilon)
         log_bulk_new = bulk_log_likelihood(snvs, phi_propose, epsilon)
+
         log_scrna_old = 0.0
         log_scrna_new = 0.0
+
         if S is not None:
             log_scrna_old = log_scrna_likelihood(S, phi, clone_has_snv, self.scrna_params)
             log_scrna_new = log_scrna_likelihood(S, phi_propose, clone_has_snv, self.scrna_params)
+
         log_prior_old = self.prior_log(phi)
         log_prior_new = self.prior_log(phi_propose)
         
         log_post_old = log_bulk_old + log_scrna_old + log_prior_old
         log_post_new = log_bulk_new + log_scrna_new + log_prior_new
 
-        #add in Hastings Correction
-        alpha_forward = np.clip(phi * 50, _ALPHA_EPS, None)
-        alpha_reverse = np.clip(phi_propose * 50, _ALPHA_EPS, None)
+        log_hastings_corr = self.hastings(phi, phi_propose, self.step)
 
-        log_forward = dirichlet_log(phi_propose, alpha_forward)
-        log_reverse = dirichlet_log(phi, alpha_reverse)
-
-        log_accept = (log_post_new - log_post_old + log_reverse - log_forward)
+        log_accept = (log_post_new - log_post_old + log_hastings_corr)
         
         accept = False
         if np.log(np.random.rand()) < log_accept:
             accept = True 
+        
+        if is_burnin:
+            self.adapt_step(1 if accept else 0)
+        
+        if accept:
             return phi_propose, accept
 
         return phi, accept

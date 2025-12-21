@@ -37,7 +37,7 @@ class Tree:
         return False
              
     
-    #returnes the index of a node in the full tree, given a clone index
+    #returns the index of a node in the full tree, given a clone index
     #a clone index would be an index from self.nodes_except_root
     def node_index_full_tree(self, clone_index):
         return self.node_list.index(self.nodes_except_root[clone_index])
@@ -370,6 +370,9 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
     map_tree = {"tree": tree, "phi": phi, "z": z, "log_posterior": -math.inf}
 
     for i in range(num_iterations):
+         is_burnin = False
+         if i <= burnin:
+             is_burnin = True
          if i % 5 == 0:
              print ("MCMC loop ", i)
          #old_tree_k = tree.k
@@ -388,7 +391,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
          bulk_snvs_updated = update_bulk_snvs_indices(bulk_snvs, z_clone)
          clone_has_snv = make_clone_has_snv_matrix(tree.snvs, tree, num_snvs)
 
-         phi = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv)
+         phi = phi_sampler.update(phi, bulk_snvs_updated, epsilon, scrna_data, clone_has_snv, is_burnin)
 
 
 
@@ -464,7 +467,7 @@ def mcmc(bulk_snvs, scrna_data, lamb_0, lamb, gamma, epsilon, num_iterations, bu
     return map_tree, chain_of_trees
 
 
-def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, scrna_config = None, phi_init = None):
+def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, burnin, scrna_config = None, phi_init = None):
     #tracks how many times we accept proposed phi values
     accepted = 0
 
@@ -498,10 +501,13 @@ def mcmc_fixed_snv(bulk_snvs, scrna_data, epsilon, num_iterations, z, scrna_conf
     clone_has_snv = make_clone_has_snv_matrix(fixed_tree.snvs, fixed_tree, num_snvs)
 
     for i in range(num_iterations):
+         is_burnin = False
+         if i <= burnin:
+             is_burnin = True
          if i % 5 == 0:
              print ("MCMC loop ", i)
 
-         phi, accept = phi_sampler.update(phi, bulk_snvs, epsilon, scrna_data, clone_has_snv)
+         phi, accept = phi_sampler.update(phi, bulk_snvs, epsilon, scrna_data, clone_has_snv, is_burnin)
          if accept:
              accepted += 1
 
